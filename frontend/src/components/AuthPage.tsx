@@ -115,103 +115,91 @@ export const AuthPage: React.FC = () => {
   const isBusy = submitting;
 
   return (
-    <div className="relative min-h-screen w-full bg-[#07080a] text-white flex items-center justify-center p-4 sm:p-6 overflow-hidden select-none">
-      {/* Subtle organic dark background waves matching reference backdrop */}
+    <div
+      className="relative min-h-screen w-full text-white flex flex-col md:flex-row overflow-x-hidden select-none"
+      style={{
+        background:
+          'linear-gradient(135deg, #15161c 0%, #0f1015 52%, #090a0d 100%)',
+      }}
+    >
+      {/* Subtle organic dark ambient glow matching ChatGPT dark theme */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 overflow-hidden"
       >
         <div
-          className="absolute -top-48 -left-48 w-[520px] h-[520px] rounded-full opacity-25"
+          className="absolute -top-48 -left-48 w-[640px] h-[640px] rounded-full opacity-30"
           style={{
             background:
-              'radial-gradient(circle, rgba(38,42,54,0.65) 0%, rgba(7,8,10,0) 70%)',
+              'radial-gradient(circle, rgba(44,49,64,0.55) 0%, rgba(15,16,21,0) 70%)',
           }}
         />
         <div
-          className="absolute -bottom-56 -right-40 w-[620px] h-[620px] rounded-full opacity-25"
+          className="absolute -bottom-56 -right-40 w-[680px] h-[680px] rounded-full opacity-25"
           style={{
             background:
-              'radial-gradient(circle, rgba(35,38,49,0.65) 0%, rgba(7,8,10,0) 70%)',
+              'radial-gradient(circle, rgba(35,38,49,0.55) 0%, rgba(9,10,13,0) 70%)',
           }}
         />
       </div>
 
-      {/* Main Rounded Dark Charcoal Glass Card */}
-      <div
-        className="relative z-10 w-full max-w-[960px] rounded-[24px] border border-white/[0.12] overflow-hidden shadow-[0_32px_90px_rgba(0,0,0,0.88)] flex flex-col md:flex-row"
-        style={{
-          background:
-            'linear-gradient(135deg, #16171d 0%, #111216 48%, #0e0f13 100%)',
-        }}
-      >
-        {/* Subtle top-left corner specular highlight inside card */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute top-0 left-0 w-72 h-72 opacity-30"
-          style={{
-            background:
-              'radial-gradient(circle at top left, rgba(255,255,255,0.08), transparent 68%)',
-          }}
-        />
+      {/* LEFT HALF (50% Full Screen): Uploaded 3D Robot Illustration */}
+      <div className="hidden md:flex md:w-1/2 min-h-screen items-center justify-center p-10 lg:p-16 relative z-10">
+        <div className="relative w-full max-w-[440px] xl:max-w-[500px] flex items-center justify-center">
+          <img
+            src="/auth-robot.png"
+            alt="CERBERUS-X Intelligent Assistant"
+            className="w-full h-auto object-contain pointer-events-none"
+            style={{
+              maskImage:
+                'radial-gradient(ellipse 72% 72% at 50% 50%, black 44%, transparent 82%)',
+              WebkitMaskImage:
+                'radial-gradient(ellipse 72% 72% at 50% 50%, black 44%, transparent 82%)',
+            }}
+          />
+        </div>
+      </div>
 
-        {/* LEFT PANEL: Uploaded 3D Robot Illustration */}
-        <div className="hidden md:flex md:w-[47%] items-center justify-center px-6 py-10 relative">
-          <div className="relative w-full max-w-[360px] flex items-center justify-center">
+      {/* RIGHT HALF (50% Full Screen): Authentication Form */}
+      <div className="relative z-10 w-full md:w-1/2 min-h-screen flex flex-col justify-center items-center px-6 py-10 sm:px-12 lg:px-20">
+        <div className="w-full max-w-[400px] mx-auto">
+          {/* Mobile-only compact robot avatar */}
+          <div className="flex md:hidden justify-center mb-3">
             <img
               src="/auth-robot.png"
-              alt="CERBERUS-X Intelligent Assistant"
-              className="w-full h-auto object-contain pointer-events-none"
+              alt="CERBERUS-X"
+              className="w-28 h-28 object-contain"
               style={{
                 maskImage:
-                  'radial-gradient(ellipse 88% 88% at 50% 50%, black 58%, transparent 100%)',
+                  'radial-gradient(circle at center, black 44%, transparent 82%)',
                 WebkitMaskImage:
-                  'radial-gradient(ellipse 88% 88% at 50% 50%, black 58%, transparent 100%)',
+                  'radial-gradient(circle at center, black 44%, transparent 82%)',
               }}
             />
           </div>
-        </div>
 
-        {/* RIGHT PANEL: Authentication Form */}
-        <div className="w-full md:w-[53%] flex flex-col justify-center px-7 py-10 sm:px-12 sm:py-12">
-          <div className="w-full max-w-[350px] mx-auto">
-            {/* Mobile-only compact robot avatar */}
-            <div className="flex md:hidden justify-center mb-3">
+          {/* Custom Brand Logo + Brand Header */}
+          <div className="flex flex-col items-center text-center mb-8">
+            <div className="mb-3 flex items-center justify-center">
               <img
-                src="/auth-robot.png"
-                alt="CERBERUS-X"
-                className="w-24 h-24 object-contain"
+                src="/logo.png"
+                alt="CERBERUS-X Logo"
+                className="w-20 h-20 object-contain drop-shadow-[0_0_24px_rgba(255,255,255,0.2)]"
                 style={{
                   maskImage:
-                    'radial-gradient(circle at center, black 55%, transparent 98%)',
+                    'radial-gradient(circle at center, black 46%, transparent 74%)',
                   WebkitMaskImage:
-                    'radial-gradient(circle at center, black 55%, transparent 98%)',
+                    'radial-gradient(circle at center, black 46%, transparent 74%)',
                 }}
               />
             </div>
-
-            {/* Custom Brand Logo + Brand Header */}
-            <div className="flex flex-col items-center text-center mb-7">
-              <div className="mb-2.5 flex items-center justify-center">
-                <img
-                  src="/logo.png"
-                  alt="CERBERUS-X Logo"
-                  className="w-16 h-16 object-contain rounded-2xl drop-shadow-[0_0_20px_rgba(255,255,255,0.18)]"
-                  style={{
-                    maskImage:
-                      'radial-gradient(circle at center, black 62%, transparent 98%)',
-                    WebkitMaskImage:
-                      'radial-gradient(circle at center, black 62%, transparent 98%)',
-                  }}
-                />
-              </div>
-              <h1 className="text-[26px] font-bold tracking-[0.06em] text-white leading-tight">
-                CERBERUS-X
-              </h1>
-              <p className="text-[13px] text-[#a1a1aa] mt-1 font-normal">
-                Where Evidence Meets Intelligence.
-              </p>
-            </div>
+            <h1 className="text-[28px] sm:text-[30px] font-bold tracking-[0.06em] text-white leading-tight">
+              CERBERUS-X
+            </h1>
+            <p className="text-[13.5px] text-[#a1a1aa] mt-1.5 font-normal">
+              Where Evidence Meets Intelligence.
+            </p>
+          </div>
 
             {/* Firebase config guidance banner if .env is blank */}
             {!isConfigured && (
@@ -435,7 +423,6 @@ export const AuthPage: React.FC = () => {
                 </>
               )}
             </div>
-          </div>
         </div>
       </div>
     </div>
