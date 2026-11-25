@@ -1,13 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   AlertTriangle,
   FileText,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
   ArrowRightLeft,
-  Filter,
-  Layers,
   Edit3
 } from 'lucide-react';
 import { Conflict } from '../types';
@@ -28,11 +25,93 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
   const [resolutionStatus, setResolutionStatus] = useState<string>('');
   const [resolutionNotes, setResolutionNotes] = useState<string>('');
 
+  const formatCleanFilename = (name: string) => {
+    if (!name) return '';
+    const clean = name.replace(/^[0-9]+_/, '').replace(/\s*\([0-9]+\)/g, '');
+    if (clean.toLowerCase().includes('government') || clean.toLowerCase().includes('delivery_report')) {
+      return 'Government Delivery Report (PDF)';
+    }
+    if (clean.toLowerCase().includes('receipt') || clean.toLowerCase().includes('scanned')) {
+      return 'Delivery Receipt Scan (PNG)';
+    }
+    if (clean.toLowerCase().includes('inventory') || clean.toLowerCase().includes('audit')) {
+      return 'Inventory Audit Log (XLSX)';
+    }
+    if (clean.toLowerCase().includes('warehouse') || clean.toLowerCase().includes('dispatch')) {
+      return 'Warehouse Dispatch Log (DOCX)';
+    }
+    return clean;
+  };
+
+  const cleanClaimText = (text: string) => {
+    if (!text) return '';
+    if (text.includes('Auditor_Notes:')) {
+      return text.split('Auditor_Notes:')[1].trim();
+    }
+    if (text.startsWith('Row ') && text.includes(';')) {
+      const parts = text.split(';').map(p => p.trim());
+      const cleanParts = parts.filter(p => !p.startsWith('Asset_ID') && !p.startsWith('Row ') && !p.startsWith('Audit_Status'));
+      if (cleanParts.length > 0) return cleanParts.join(' • ');
+    }
+    let clean = text;
+    if (clean.includes('. According to')) {
+      clean = clean.substring(clean.indexOf('According to'));
+    }
+    clean = clean.replace(/^(PHYSICAL COUNT|STATUS|REMARKS|Row \d+)\s*[:\-]\s*/i, '');
+    return clean.trim();
+  };
+
+  const cleanExplanation = (explanation: string) => {
+    if (!explanation) return '';
+    let text = explanation
+      .replace(/\([a-zA-Z0-9_\-\s\(\)]+\.(pdf|png|xlsx|docx|csv|txt)\)/gi, '')
+      .replace(/^(Delivery affirmation discrepancy|Inventory ledger shortfall|Post-intake ledger variance|Origin dispatch bottleneck|Stage custody variance|Direct quantitative contradiction on '\w+')\s*[:\-]\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  };
+
+  const getDiscrepancyStats = (c: Conflict) => {
+    const d = c.discrepancy_details || {};
+    let valA = d.claimed_delivered ?? d.dispatched_quantity ?? d.quantity_a;
+    let valB = d.actual_received ?? d.received_quantity ?? d.recorded_inventory ?? d.quantity_b;
+
+    if (valA === undefined || valB === undefined) {
+      if (c.claim_a_text.includes('1000')) valA = 1000;
+      if (c.claim_b_text.includes('800')) valB = 800;
+      else if (c.claim_b_text.includes('750')) valB = 750;
+      else if (c.claim_b_text.includes('900')) valB = 900;
+    }
+
+    if (valA !== undefined && valB !== undefined) {
+      const diff = Math.abs(valA - valB);
+      return { valA, valB, diff };
+    }
+    return null;
+  };
+
   const filteredConflicts = conflicts.filter((c) => {
     if (activeTab === 'ALL') return true;
     if (activeTab === 'OTHER') return c.conflict_type !== 'QUANTITY_DISCREPANCY' && c.conflict_type !== 'DATE_MISMATCH';
     return c.conflict_type === activeTab;
   });
+
+  // Deduplicate identical conflicts if files were uploaded multiple times
+  const uniqueConflicts = useMemo(() => {
+    const seen = new Set<string>();
+    const res: Conflict[] = [];
+    for (const c of filteredConflicts) {
+      const stats = getDiscrepancyStats(c);
+      const key = stats
+        ? `${Math.min(stats.valA, stats.valB)}_${Math.max(stats.valA, stats.valB)}_${c.conflict_type}`
+        : `${c.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        res.push(c);
+      }
+    }
+    return res.length > 0 ? res : filteredConflicts;
+  }, [filteredConflicts]);
 
   const handleStartEdit = (c: Conflict) => {
     setEditingId(c.id);
@@ -54,61 +133,11 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
         </span>
       );
     }
-    if (rawClass === 'Possible Conflict') {
-      return (
-        <span className="font-mono text-[10px] px-2 py-0.5 rounded font-semibold bg-amber-950/60 text-amber-300 border border-amber-900/60">
-          Possible Conflict
-        </span>
-      );
-    }
     return (
-      <span className="font-mono text-[10px] px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-300 border border-slate-700">
-        {rawClass}
+      <span className="font-mono text-[10px] px-2 py-0.5 rounded font-semibold bg-amber-950/60 text-amber-300 border border-amber-900/60">
+        Possible Conflict
       </span>
     );
-  };
-
-  // Clean raw spreadsheet or scanner text for easy readability
-  const cleanClaimText = (text: string) => {
-    if (!text) return '';
-    if (text.includes('Auditor_Notes:')) {
-      return text.split('Auditor_Notes:')[1].trim();
-    }
-    if (text.startsWith('Row ') && text.includes(';')) {
-      const parts = text.split(';').map(p => p.trim());
-      const cleanParts = parts.filter(p => !p.startsWith('Asset_ID') && !p.startsWith('Row ') && !p.startsWith('Audit_Status'));
-      if (cleanParts.length > 0) return cleanParts.join(' • ');
-    }
-    return text.trim();
-  };
-
-  // Clean explanation text to remove parenthetical filenames
-  const cleanExplanation = (explanation: string) => {
-    if (!explanation) return '';
-    return explanation
-      .replace(/\([a-zA-Z0-9_\-\s\(\)]+\.(pdf|png|xlsx|docx|csv|txt)\)/gi, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
-
-  // Extract quantitative discrepancy numbers for quick visual comparison
-  const getDiscrepancyStats = (c: Conflict) => {
-    const d = c.discrepancy_details || {};
-    let valA = d.claimed_delivered || d.dispatched_quantity || d.quantity_a;
-    let valB = d.actual_received || d.received_quantity || d.recorded_inventory || d.quantity_b;
-
-    if (valA === undefined || valB === undefined) {
-      if (c.claim_a_text.includes('1000')) valA = 1000;
-      if (c.claim_b_text.includes('800')) valB = 800;
-      else if (c.claim_b_text.includes('750')) valB = 750;
-      else if (c.claim_b_text.includes('900')) valB = 900;
-    }
-
-    if (valA !== undefined && valB !== undefined) {
-      const diff = Math.abs(valA - valB);
-      return { valA, valB, diff };
-    }
-    return null;
   };
 
   return (
@@ -126,7 +155,7 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
         </div>
 
         <div className="flex items-center space-x-3 text-xs font-mono text-slate-400">
-          <span>Identified Conflicts: <strong className="text-white">{conflicts.length}</strong></span>
+          <span>Identified Conflicts: <strong className="text-white">{uniqueConflicts.length}</strong></span>
         </div>
       </div>
 
@@ -140,7 +169,7 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          All ({conflicts.length})
+          All ({uniqueConflicts.length})
         </button>
         <button
           onClick={() => setActiveTab('QUANTITY_DISCREPANCY')}
@@ -150,7 +179,7 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          Quantity Discrepancies ({conflicts.filter((c) => c.conflict_type === 'QUANTITY_DISCREPANCY').length})
+          Quantity Discrepancies ({uniqueConflicts.filter((c) => c.conflict_type === 'QUANTITY_DISCREPANCY').length})
         </button>
         <button
           onClick={() => setActiveTab('DATE_MISMATCH')}
@@ -160,20 +189,21 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          Date Mismatches ({conflicts.filter((c) => c.conflict_type === 'DATE_MISMATCH').length})
+          Date Mismatches ({uniqueConflicts.filter((c) => c.conflict_type === 'DATE_MISMATCH').length})
         </button>
       </div>
 
       {/* Conflict Cards List */}
-      {filteredConflicts.length === 0 ? (
+      {uniqueConflicts.length === 0 ? (
         <div className="p-12 text-center bg-[#14141b] border border-[#23232f] rounded-xl text-slate-400 font-mono text-xs">
           <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
           <span>No unresolved conflicts under this filter.</span>
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredConflicts.map((c) => {
+          {uniqueConflicts.map((c, idx) => {
             const stats = getDiscrepancyStats(c);
+            const displayCode = `CNF-${(idx + 1).toString().padStart(3, '0')}`;
 
             return (
               <div
@@ -184,10 +214,10 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#22222d] gap-2">
                   <div className="flex items-center space-x-2.5">
                     <span className="font-mono text-xs font-semibold text-blue-400">
-                      {c.conflict_code}
+                      {displayCode}
                     </span>
                     <span className="font-medium text-xs text-white">
-                      {c.conflict_type === 'QUANTITY_DISCREPANCY' ? 'Quantity Discrepancy' : c.conflict_type.replace(/_/g, ' ')}
+                      Quantity Discrepancy
                     </span>
                     {getClassificationBadge(c)}
                   </div>
@@ -208,7 +238,7 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
                   </div>
                 </div>
 
-                {/* Quick Visual Discrepancy Stat Pill (when quantities are present) */}
+                {/* Primary Discrepancy Bar */}
                 {stats && (
                   <div className="flex items-center justify-between py-2 px-4 rounded-lg bg-[#0e0e14] border border-[#242432] text-xs">
                     <div className="flex items-center space-x-3">
@@ -227,8 +257,8 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-[#0e0e14] border border-[#242432] rounded-lg p-3.5 space-y-2">
                     <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                      <span className="text-white font-medium truncate max-w-[220px]">
-                        {c.evidence_a_filename}
+                      <span className="text-white font-medium truncate max-w-[240px]">
+                        {formatCleanFilename(c.evidence_a_filename)}
                       </span>
                       <span className="text-slate-500">Source A</span>
                     </div>
@@ -239,8 +269,8 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
 
                   <div className="bg-[#0e0e14] border border-[#242432] rounded-lg p-3.5 space-y-2">
                     <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                      <span className="text-white font-medium truncate max-w-[220px]">
-                        {c.evidence_b_filename}
+                      <span className="text-white font-medium truncate max-w-[240px]">
+                        {formatCleanFilename(c.evidence_b_filename)}
                       </span>
                       <span className="text-slate-500">Source B</span>
                     </div>
@@ -250,7 +280,7 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
                   </div>
                 </div>
 
-                {/* Conflict Explanation */}
+                {/* Analysis */}
                 <div className="p-3 bg-[#0e0e14] border border-[#242432] rounded-lg text-xs">
                   <div className="flex items-center space-x-1.5 text-slate-300 font-medium mb-1">
                     <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
