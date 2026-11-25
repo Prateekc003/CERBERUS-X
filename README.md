@@ -38,11 +38,13 @@
 ```
 
 ### Technology Stack:
-- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, `@xyflow/react` (React Flow), Recharts, Lucide React.
+- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, `@xyflow/react` (React Flow), Recharts, Lucide React, Firebase JS SDK v11.
 - **Backend:** Python 3.13, FastAPI, Uvicorn, SQLAlchemy ORM, Pydantic v2.
+- **Authentication & Security:** Firebase Authentication (`cerberus-x-2561e`), Cloud Firestore, and enterprise session handling.
 - **AI/ML & Local Processing:**
-  - **Ollama:** Offline local LLM reasoning (e.g. `llama3`).
+  - **Ollama:** Offline local LLM reasoning powered by **Qwen 3.5 (`qwen3.5:4b`)** with dynamic model auto-discovery.
   - **Deterministic Rule-Based Fallback:** Active when Ollama is unavailable, with clear visual badge `[MODE: RULE_BASED_INFERENCE]`.
+  - **spaCy:** Local Named Entity Recognition (`en_core_web_sm`).
   - **PyMuPDF (`pymupdf`):** High-speed PDF text, layout, and metadata extraction.
   - **python-docx:** Microsoft Word document paragraphs and tabular data.
   - **OpenPyXL & Pandas:** Tabular Excel (`.xlsx`) and CSV structured dataset parsing.
@@ -136,7 +138,7 @@ The system includes a pre-packaged, fully physical seed scenario:
 ### Prerequisites
 - Python 3.10+ (tested on Python 3.13)
 - Node.js 18+ & npm (tested on Node v22)
-- (Optional) [Ollama](https://ollama.ai) installed locally with `ollama run llama3`
+- [Ollama](https://ollama.ai) installed locally with `ollama run qwen3.5:4b`
 
 ### Project Directory Setup
 The project is located at:
