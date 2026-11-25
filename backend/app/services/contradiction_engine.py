@@ -289,3 +289,6 @@ def detect_conflicts_between_claims(claims: List[Dict[str, Any]], evidence_map: 
                         conflict_count += 1
 
     return conflicts
+
+extract_structured_claims = extract_structured_claims_from_text
+
