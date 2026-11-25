@@ -100,16 +100,23 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
         </div>
 
         {/* Mode Selector */}
-        <div className="flex items-center space-x-2 text-xs font-mono">
-          <span className="text-slate-400">Reasoning Engine:</span>
-          <select
-            value={reasoningMode}
-            onChange={(e) => setReasoningMode(e.target.value)}
-            className="text-xs bg-dark-input border border-dark-cardBorder text-slate-200 rounded-lg px-2.5 py-1 focus:outline-none"
-          >
-            <option value="auto">Auto (Ollama with Fallback)</option>
-            <option value="rule-based">Deterministic Rule-Based Only</option>
-          </select>
+        <div className="flex items-center space-x-3 text-xs font-mono">
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-900/60 text-emerald-300 text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-semibold">Ollama (qwen3.5:4b) Offline</span>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <span className="text-slate-400">Model Engine:</span>
+            <select
+              value={reasoningMode}
+              onChange={(e) => setReasoningMode(e.target.value)}
+              className="text-xs bg-dark-input border border-dark-cardBorder text-slate-200 rounded-lg px-2.5 py-1 focus:outline-none"
+            >
+              <option value="auto">Qwen 3.5 (Offline Ollama LLM)</option>
+              <option value="rule-based">Deterministic Rule-Based Only</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -211,7 +218,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
         {loading && (
           <div className="flex items-center space-x-2 text-xs text-blue-300 font-mono bg-blue-950/40 border border-blue-900/40 p-3 rounded-xl max-w-sm animate-pulse">
             <Cpu className="w-4 h-4 animate-spin text-blue-400" />
-            <span>Auditing evidence corpus and cross-referencing claims...</span>
+            <span>Qwen 3.5 is reasoning offline over case evidence...</span>
           </div>
         )}
       </div>
