@@ -31,10 +31,10 @@ export const ReportDossier: React.FC<ReportDossierProps> = ({
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight flex items-center space-x-2">
             <FileText className="w-5 h-5 text-blue-400" />
-            <span>Investigation Intelligence Dossier</span>
+            <span>Reports & Output</span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            10-Section verifiable forensic intelligence report formatted for prosecutors, auditors, and leadership.
+            Comprehensive investigation report with evidence citations, conflict analysis, and findings.
           </p>
         </div>
 

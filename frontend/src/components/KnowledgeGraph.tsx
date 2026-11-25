@@ -128,10 +128,10 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ graphData, onRef
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight flex items-center space-x-2">
             <Share2 className="w-5 h-5 text-blue-400" />
-            <span>Evidentiary Knowledge Graph</span>
+            <span>Knowledge Graph</span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            NetworkX graph visualizing connected claims, documents, entities, and active contradiction links.
+            Interactive graph linking evidence documents, claims, entities, and conflicts.
           </p>
         </div>
 

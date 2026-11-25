@@ -5,10 +5,7 @@ import {
   CheckCircle2,
   AlertCircle,
   HelpCircle,
-  ShieldAlert,
   ArrowRight,
-  Save,
-  Clock,
   Filter,
   Layers
 } from 'lucide-react';
@@ -47,239 +44,210 @@ export const ContradictionCenter: React.FC<ContradictionCenterProps> = ({
     setEditingId(null);
   };
 
+  const getClassificationBadge = (c: Conflict) => {
+    const rawClass = (c as any).classification || (c.severity === 'HIGH' ? 'Confirmed Conflict' : 'Possible Conflict');
+    if (rawClass === 'Confirmed Conflict') {
+      return (
+        <span className="font-mono text-[10px] px-2 py-0.5 rounded font-medium bg-rose-950/60 text-rose-300 border border-rose-900/60">
+          Confirmed Conflict
+        </span>
+      );
+    }
+    if (rawClass === 'Possible Conflict') {
+      return (
+        <span className="font-mono text-[10px] px-2 py-0.5 rounded font-medium bg-amber-950/60 text-amber-300 border border-amber-900/60">
+          Possible Conflict
+        </span>
+      );
+    }
+    return (
+      <span className="font-mono text-[10px] px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-300 border border-slate-700">
+        {rawClass}
+      </span>
+    );
+  };
+
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Module Title Banner */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto text-slate-200">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-[#22222d] gap-4">
         <div>
-          <div className="flex items-center space-x-2 text-xs font-mono text-red-600 font-bold uppercase mb-1">
-            <AlertTriangle className="w-4 h-4 text-red-600" />
-            <span>PRIMARY AUDIT ENGINE: CONTRADICTION & DISCREPANCY AUDITOR</span>
-          </div>
-          <h1 className="text-xl font-bold text-navy-900 tracking-tight">
-            Cross-Document Evidentiary Conflicts ({conflicts.length})
+          <h1 className="text-xl font-bold text-white tracking-tight flex items-center space-x-2">
+            <AlertTriangle className="w-5 h-5 text-amber-400" />
+            <span>Conflict Detection</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
-            Detects quantitative variance across custody stages (dispatched vs received vs recorded),
-            chronological impossibilities, and conflicting status assertions across independent evidence sources.
+          <p className="text-xs text-slate-400 mt-1">
+            Cross-document discrepancies, quantity mismatches, and contradictory claims.
           </p>
         </div>
 
-        {/* Conflict count summary pill */}
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 shrink-0 flex items-center space-x-3 text-red-900">
-          <div className="w-3 h-3 rounded-full bg-red-600 animate-pulse" />
-          <div>
-            <div className="text-xs font-mono font-bold uppercase">Active Contradictions</div>
-            <div className="text-lg font-mono font-extrabold text-red-700">{conflicts.length} Identified</div>
-          </div>
+        <div className="flex items-center space-x-3 text-xs font-mono text-slate-400">
+          <span>Identified Conflicts: <strong className="text-white">{conflicts.length}</strong></span>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center space-x-2 border-b border-slate-200 pb-2">
+      <div className="flex items-center space-x-2 border-b border-[#22222d] pb-2">
         <button
           onClick={() => setActiveTab('ALL')}
-          className={`text-xs font-mono px-3 py-1.5 rounded transition-colors ${
+          className={`text-xs px-3 py-1.5 rounded-lg transition-colors font-medium ${
             activeTab === 'ALL'
-              ? 'bg-navy-900 text-white font-semibold'
-              : 'text-slate-600 hover:bg-slate-100'
+              ? 'bg-[#1f1f2b] text-white'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
-          All Conflicts ({conflicts.length})
+          All ({conflicts.length})
         </button>
         <button
           onClick={() => setActiveTab('QUANTITY_DISCREPANCY')}
-          className={`text-xs font-mono px-3 py-1.5 rounded transition-colors ${
+          className={`text-xs px-3 py-1.5 rounded-lg transition-colors font-medium ${
             activeTab === 'QUANTITY_DISCREPANCY'
-              ? 'bg-red-700 text-white font-semibold'
-              : 'text-slate-600 hover:bg-slate-100'
+              ? 'bg-[#1f1f2b] text-white'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
           Quantity Discrepancies ({conflicts.filter((c) => c.conflict_type === 'QUANTITY_DISCREPANCY').length})
         </button>
         <button
           onClick={() => setActiveTab('DATE_MISMATCH')}
-          className={`text-xs font-mono px-3 py-1.5 rounded transition-colors ${
+          className={`text-xs px-3 py-1.5 rounded-lg transition-colors font-medium ${
             activeTab === 'DATE_MISMATCH'
-              ? 'bg-amber-600 text-white font-semibold'
-              : 'text-slate-600 hover:bg-slate-100'
+              ? 'bg-[#1f1f2b] text-white'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
-          Temporal / Date Mismatches ({conflicts.filter((c) => c.conflict_type === 'DATE_MISMATCH').length})
+          Date Mismatches ({conflicts.filter((c) => c.conflict_type === 'DATE_MISMATCH').length})
         </button>
       </div>
 
       {/* Conflict Cards List */}
       {filteredConflicts.length === 0 ? (
-        <div className="p-12 text-center bg-white border border-slate-200 rounded-lg text-slate-400 font-mono text-xs">
-          <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-          <span>No unresolved conflicts under this filter. All assertions reconciled.</span>
+        <div className="p-12 text-center bg-[#14141b] border border-[#23232f] rounded-xl text-slate-400 font-mono text-xs">
+          <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+          <span>No unresolved conflicts under this filter.</span>
         </div>
       ) : (
         <div className="space-y-4">
           {filteredConflicts.map((c) => (
             <div
               key={c.id}
-              className="bg-white border border-slate-200 rounded-lg shadow-sm hover:border-slate-300 transition-all overflow-hidden"
+              className="bg-[#14141b] border border-[#23232f] rounded-xl p-5 space-y-4 shadow-sm hover:border-[#2f2f3e] transition-all"
             >
               {/* Conflict Header */}
-              <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#22222d] gap-2">
                 <div className="flex items-center space-x-2.5">
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-red-100 text-red-800 border border-red-200">
+                  <span className="font-mono text-xs font-semibold text-blue-400">
                     {c.conflict_code}
                   </span>
-                  <span className="font-mono text-xs font-semibold text-slate-800">
+                  <span className="font-medium text-xs text-white">
                     {c.conflict_type.replace(/_/g, ' ')}
                   </span>
-                  <span
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
-                      c.severity === 'HIGH'
-                        ? 'bg-red-600 text-white'
-                        : c.severity === 'MEDIUM'
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-slate-600 text-white'
-                    }`}
-                  >
-                    {c.severity} SEVERITY
-                  </span>
+                  {getClassificationBadge(c)}
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <span className="text-[11px] font-mono text-slate-500">Status:</span>
-                  <span
-                    className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                      c.verification_status === 'DETECTED'
-                        ? 'bg-red-100 text-red-800 border border-red-300'
-                        : c.verification_status === 'UNDER_REVIEW'
-                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                        : c.verification_status === 'RESOLVED_EXPLAINED'
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#0e0e14] border border-[#282836] text-slate-300 uppercase">
                     {c.verification_status.replace(/_/g, ' ')}
                   </span>
-                </div>
-              </div>
-
-              {/* Side-by-side Comparative Evidence Display */}
-              <div className="p-5 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Claim A */}
-                  <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-2 relative">
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
-                      <span className="font-bold text-navy-900 flex items-center space-x-1.5">
-                        <FileText className="w-3.5 h-3.5 text-blue-600" />
-                        <span className="truncate max-w-[220px]">{c.evidence_a_filename}</span>
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">Assertion A</span>
-                    </div>
-
-                    <div className="p-3 bg-white border border-slate-200 rounded text-xs font-medium text-slate-800 leading-relaxed italic">
-                      “{c.claim_a_text}”
-                    </div>
-                  </div>
-
-                  {/* Claim B */}
-                  <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-2 relative">
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
-                      <span className="font-bold text-navy-900 flex items-center space-x-1.5">
-                        <FileText className="w-3.5 h-3.5 text-red-600" />
-                        <span className="truncate max-w-[220px]">{c.evidence_b_filename}</span>
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">Assertion B</span>
-                    </div>
-
-                    <div className="p-3 bg-white border border-slate-200 rounded text-xs font-medium text-slate-800 leading-relaxed italic">
-                      “{c.claim_b_text}”
-                    </div>
-                  </div>
-                </div>
-
-                {/* Analytical Explanation */}
-                <div className="p-3.5 bg-blue-50/50 border border-blue-200 rounded-lg">
-                  <p className="text-xs font-semibold text-navy-900 mb-1 flex items-center space-x-1.5">
-                    <AlertCircle className="w-4 h-4 text-blue-700" />
-                    <span>Investigative Conflict Analysis:</span>
-                  </p>
-                  <p className="text-xs text-slate-700 leading-relaxed">{c.explanation}</p>
-                </div>
-
-                {/* Status Update / Review Notes */}
-                {editingId === c.id ? (
-                  <div className="pt-3 border-t border-slate-200 space-y-3 bg-slate-50 p-4 rounded-lg">
-                    <h4 className="text-xs font-mono font-bold uppercase text-slate-700">
-                      Investigator Resolution Workflow
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-[10px] font-mono uppercase text-slate-500 block mb-1">
-                          Verification Status
-                        </label>
-                        <select
-                          value={resolutionStatus}
-                          onChange={(e) => setResolutionStatus(e.target.value)}
-                          className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                        >
-                          <option value="DETECTED">DETECTED</option>
-                          <option value="UNDER_REVIEW">UNDER_REVIEW</option>
-                          <option value="VERIFIED_CONFLICT">VERIFIED_CONFLICT</option>
-                          <option value="RESOLVED_EXPLAINED">RESOLVED_EXPLAINED</option>
-                          <option value="DISMISSED">DISMISSED</option>
-                        </select>
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <label className="text-[10px] font-mono uppercase text-slate-500 block mb-1">
-                          Auditor Resolution Notes
-                        </label>
-                        <input
-                          type="text"
-                          value={resolutionNotes}
-                          onChange={(e) => setResolutionNotes(e.target.value)}
-                          placeholder="e.g. Subpoenaed warehouse receipt confirms 200 units damaged in transit."
-                          className="w-full text-xs border border-slate-300 rounded px-3 py-1.5 bg-white"
-                        >
-                        </input>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end space-x-2 pt-2">
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="text-xs px-3 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-100"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSaveStatus(c.id)}
-                        disabled={loading}
-                        className="text-xs font-medium px-4 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-1.5 shadow-sm"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Save Determination</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500 gap-2">
-                    <div className="font-mono text-[11px]">
-                      {c.resolution_notes ? (
-                        <span>Notes: <strong className="text-slate-700">{c.resolution_notes}</strong></span>
-                      ) : (
-                        <span className="text-slate-400 italic">No investigator notes recorded yet.</span>
-                      )}
-                    </div>
-
+                  {editingId !== c.id && (
                     <button
                       onClick={() => handleStartEdit(c)}
-                      className="text-xs text-blue-700 hover:underline font-mono"
+                      className="text-xs text-blue-400 hover:underline font-mono"
                     >
-                      Update Verification Status →
+                      Update Status
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Side-by-Side Comparison of Claims */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-[#0e0e14] border border-[#242432] rounded-lg p-3.5 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <span className="text-white font-medium truncate max-w-[220px]">
+                      {c.evidence_a_filename}
+                    </span>
+                    <span className="text-slate-500">Source A</span>
+                  </div>
+                  <p className="text-xs text-slate-200 leading-relaxed italic bg-[#14141b] p-2.5 rounded border border-[#22222d]">
+                    "{c.claim_a_text}"
+                  </p>
+                </div>
+
+                <div className="bg-[#0e0e14] border border-[#242432] rounded-lg p-3.5 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <span className="text-white font-medium truncate max-w-[220px]">
+                      {c.evidence_b_filename}
+                    </span>
+                    <span className="text-slate-500">Source B</span>
+                  </div>
+                  <p className="text-xs text-slate-200 leading-relaxed italic bg-[#14141b] p-2.5 rounded border border-[#22222d]">
+                    "{c.claim_b_text}"
+                  </p>
+                </div>
+              </div>
+
+              {/* Conflict Explanation */}
+              <div className="p-3 bg-[#0e0e14] border border-[#242432] rounded-lg text-xs">
+                <div className="flex items-center space-x-1.5 text-slate-300 font-medium mb-1">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-white font-semibold">Analysis:</span>
+                </div>
+                <p className="text-slate-300 leading-relaxed">{c.explanation}</p>
+              </div>
+
+              {/* Status & Resolution Editor */}
+              {editingId === c.id && (
+                <div className="pt-3 border-t border-[#22222d] space-y-3 bg-[#101017] p-3.5 rounded-lg">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={resolutionStatus}
+                        onChange={(e) => setResolutionStatus(e.target.value)}
+                        className="w-full text-xs bg-[#0e0e14] border border-[#2a2a38] text-white rounded p-1.5 focus:outline-none"
+                      >
+                        <option value="DETECTED">Detected</option>
+                        <option value="UNDER_REVIEW">Under Review</option>
+                        <option value="VERIFIED_CONFLICT">Verified Conflict</option>
+                        <option value="RESOLVED_EXPLAINED">Resolved / Explained</option>
+                        <option value="DISMISSED">Dismissed</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                        Investigator Notes
+                      </label>
+                      <input
+                        type="text"
+                        value={resolutionNotes}
+                        onChange={(e) => setResolutionNotes(e.target.value)}
+                        className="w-full text-xs bg-[#0e0e14] border border-[#2a2a38] text-white rounded p-1.5 focus:outline-none"
+                        placeholder="e.g. Dock receipt confirms 800 units; remaining 200 unreceived."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-1">
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="text-xs px-3 py-1 rounded border border-[#2a2a38] text-slate-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleSaveStatus(c.id)}
+                      disabled={loading}
+                      className="text-xs font-semibold px-4 py-1 rounded bg-white text-black hover:bg-slate-200"
+                    >
+                      Save Status
                     </button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -17,10 +17,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="pb-4 border-b border-dark-borderSubtle">
         <h1 className="text-xl font-bold text-white tracking-tight flex items-center space-x-2">
           <Settings className="w-5 h-5 text-slate-400" />
-          <span>System Settings & Operational Parameters</span>
+          <span>Settings</span>
         </h1>
         <p className="text-xs text-slate-400 mt-0.5">
-          Configure offline local reasoning engines, database persistence, and system integrity safeguards.
+          System configuration, AI reasoning modes, and local database settings.
         </p>
       </div>
 

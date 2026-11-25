@@ -55,10 +55,10 @@ export const EvidenceAnalysis: React.FC<EvidenceAnalysisProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-dark-borderSubtle gap-4">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">
-            Evidence Analysis & Reasoning Center
+            Evidence Analysis
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Deep-dive contradiction auditing, entity disambiguation, claim extraction, and explainable reliability grading.
+            Analyze contradictions, factual claims, entities, and source reliability.
           </p>
         </div>
 
@@ -119,12 +119,12 @@ export const EvidenceAnalysis: React.FC<EvidenceAnalysisProps> = ({
         <div className="space-y-4">
           <div className="bg-dark-card border border-dark-cardBorder rounded-xl p-5 flex items-center justify-between">
             <div>
-              <div className="text-xs font-mono font-bold uppercase text-amber-400 flex items-center space-x-1.5 mb-1">
+              <div className="text-xs font-mono font-medium uppercase text-amber-400 flex items-center space-x-1.5 mb-1">
                 <AlertTriangle className="w-4 h-4" />
-                <span>Active Logistical & Quantitative Conflicts</span>
+                <span>Detected Conflicts</span>
               </div>
               <p className="text-xs text-slate-400">
-                Identifies discrepancies between claimed delivery, signed dock receipts, warehouse dispatches, and inventory counts.
+                Quantity mismatches and status contradictions across independent sources.
               </p>
             </div>
             <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-amber-950/60 text-amber-300 border border-amber-900/60">
