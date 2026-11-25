@@ -199,6 +199,30 @@ def trigger_demo_seed(db: Session = Depends(get_db)):
     inv = seed_medical_supply_investigation(db)
     return {"message": "Demo scenario seeded successfully", "investigation_id": inv.id, "case_code": inv.case_code}
 
+# ----------------- TEST EVIDENCE DOWNLOAD APIs -----------------
+@app.get("/api/test-evidence/zip")
+def download_test_evidence_zip():
+    zip_path = Path("/Users/prateekmahanteshchikkoppa/.gemini/antigravity/scratch/cerberus-x/frontend/public/cerberus_test_evidence.zip")
+    if not zip_path.exists():
+        raise HTTPException(status_code=404, detail="Zip archive not found")
+    return FileResponse(
+        str(zip_path),
+        media_type="application/zip",
+        filename="cerberus_test_evidence.zip",
+        headers={"Content-Disposition": "attachment; filename=cerberus_test_evidence.zip"}
+    )
+
+@app.get("/api/test-evidence/{filename}")
+def download_test_evidence_file(filename: str):
+    file_path = Path("/Users/prateekmahanteshchikkoppa/.gemini/antigravity/scratch/cerberus-x/test_documents") / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(
+        str(file_path),
+        filename=filename,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 # ----------------- EVIDENCE UPLOAD & RETRIEVAL APIs -----------------
 @app.get("/api/evidence", response_model=List[schemas.EvidenceResponse])
 def list_evidence(investigation_id: Optional[int] = None, db: Session = Depends(get_db)):
