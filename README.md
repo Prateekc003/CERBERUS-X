@@ -1,6 +1,6 @@
 # CERBERUS-X
 ### Multimodal Evidence Intelligence & Conflict-Aware Reasoning System
-> **“Don’t Just Find Answers. Verify the Truth.”**
+> **“Where Evidence Meets Intelligence.”**
 
 ---
 

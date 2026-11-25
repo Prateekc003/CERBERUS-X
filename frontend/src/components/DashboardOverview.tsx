@@ -80,8 +80,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <h1 className="text-2xl font-bold tracking-tight text-white font-sans">
                 Welcome to CERBERUS-X
               </h1>
-              <p className="text-xs text-slate-400 mt-1">
-                Analyse, verify and find the truth from multiple sources of evidence.
+              <p className="text-xs text-slate-400 mt-1 font-medium">
+                Where Evidence Meets Intelligence.
               </p>
             </div>
           </div>

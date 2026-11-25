@@ -40,7 +40,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-sans tracking-wide">
-              “Don’t Just Find Answers. Verify the Truth.”
+              “Where Evidence Meets Intelligence.”
             </p>
           </div>
         </div>

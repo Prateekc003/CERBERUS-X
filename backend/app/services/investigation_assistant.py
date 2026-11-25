@@ -202,7 +202,7 @@ async def query_investigation_assistant(
             # Prepare contextual grounding payload
             context_prompt = (
                 "You are CERBERUS-X, an elite enterprise multimodal intelligence and evidence verification system.\n"
-                "Your motto is: 'Don't Just Find Answers. Verify the Truth.'\n"
+                "Your tagline is: 'Where Evidence Meets Intelligence.'\n"
                 "RULES:\n"
                 "1. Base answers ONLY on the provided EVIDENCE, CLAIMS, and CONFLICTS below.\n"
                 "2. NEVER fabricate citations, files, or facts.\n"

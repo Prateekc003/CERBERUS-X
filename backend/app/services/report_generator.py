@@ -55,7 +55,7 @@ def build_investigation_markdown_and_data(
         f"# CERBERUS-X INTELLIGENCE INVESTIGATION DOSSIER",
         f"**Case Reference:** {case_code} | **Classification:** OFFICIAL INVESTIGATION | **Date:** {timestamp}",
         f"**Case Title:** {title}",
-        f"**System Motto:** *“Don’t Just Find Answers. Verify the Truth.”*",
+        f"**System Tagline:** *“Where Evidence Meets Intelligence.”*",
         "",
         "---",
         "## 1. INVESTIGATION SUMMARY",
