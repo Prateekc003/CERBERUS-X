@@ -311,6 +311,11 @@ async def upload_evidence(
 
     saved_evidence = []
     
+    # Calculate globally unique evidence code counter
+    max_ev_id = db.query(func.max(models.EvidenceFile.id)).scalar() or 0
+    total_ev = db.query(models.EvidenceFile).count()
+    counter = max(max_ev_id, total_ev)
+
     for f in files:
         contents = await f.read()
         sha256 = hashlib.sha256(contents).hexdigest()
@@ -322,8 +327,12 @@ async def upload_evidence(
         with open(dest_path, "wb") as dest:
             dest.write(contents)
 
-        ev_idx = db.query(models.EvidenceFile).filter(models.EvidenceFile.investigation_id == investigation_id).count() + 1
-        ev_code = f"EVD-{datetime.datetime.utcnow().year}-{ev_idx:03d}"
+        # Generate unique non-colliding evidence_code
+        counter += 1
+        ev_code = f"EVD-{datetime.datetime.utcnow().year}-{counter:04d}"
+        while db.query(models.EvidenceFile).filter(models.EvidenceFile.evidence_code == ev_code).first():
+            counter += 1
+            ev_code = f"EVD-{datetime.datetime.utcnow().year}-{counter:04d}"
 
         # Run extraction
         extraction = process_file_multimodal(str(dest_path), f.filename)
@@ -372,8 +381,8 @@ async def upload_evidence(
             )
             db.add(c_obj)
 
-        # Extract entities
-        ents = extract_entities_from_text(extraction.get("text", ""))
+        # Extract entities using spaCy
+        ents = extract_entities_from_text(extraction.get("text", ""), source_doc=f.filename)
         for ent in ents:
             norm = ent["normalized_name"]
             existing_ent = db.query(models.Entity).filter(
@@ -392,79 +401,79 @@ async def upload_evidence(
                 )
                 db.add(new_ent)
         db.commit()
-
-        # Run conflict re-evaluation for the entire investigation
-        all_inv_claims = db.query(models.ExtractedClaim).filter(models.ExtractedClaim.investigation_id == investigation_id).all()
-        all_inv_ev = db.query(models.EvidenceFile).filter(models.EvidenceFile.investigation_id == investigation_id).all()
-        ev_map = {e.id: {"filename": e.filename, "evidence_code": e.evidence_code} for e in all_inv_ev}
-        
-        claims_dict_list = [{
-            "id": c.id,
-            "evidence_id": c.evidence_id,
-            "evidence_filename": ev_map.get(c.evidence_id, {}).get("filename"),
-            "claim_code": c.claim_code,
-            "text": c.text,
-            "claim_type": c.claim_type,
-            "subject": c.subject,
-            "predicate": c.predicate,
-            "quantity_val": c.quantity_val,
-            "quantity_unit": c.quantity_unit,
-            "quantity_action": c.quantity_action,
-            "date_val": c.date_val,
-            "location_val": c.location_val,
-            "page_or_location": c.page_or_location
-        } for c in all_inv_claims]
-
-        conflicts = detect_conflicts_between_claims(claims_dict_list, ev_map)
-        
-        # Clear existing auto conflicts and recreate
-        db.query(models.Conflict).filter(models.Conflict.investigation_id == investigation_id).delete()
-        for cf in conflicts:
-            cnf_obj = models.Conflict(
-                investigation_id=investigation_id,
-                conflict_code=cf["conflict_code"],
-                claim_a_id=cf["claim_a_id"],
-                claim_b_id=cf["claim_b_id"],
-                evidence_a_id=cf["evidence_a_id"],
-                evidence_b_id=cf["evidence_b_id"],
-                conflict_type=cf["conflict_type"],
-                severity=cf["severity"],
-                explanation=cf["explanation"],
-                discrepancy_details=json.dumps(cf.get("discrepancy_details", {})),
-                verification_status="DETECTED"
-            )
-            db.add(cnf_obj)
-        db.commit()
-
-        # Compute reliability
-        for e in all_inv_ev:
-            e_confs = [c for c in conflicts if c["evidence_a_id"] == e.id or c["evidence_b_id"] == e.id]
-            meta = json.loads(e.metadata_json) if e.metadata_json else {}
-            adv = json.loads(e.adversarial_report_json) if e.adversarial_report_json else {}
-            rel_res = evaluate_evidence_reliability(
-                evidence_meta=meta,
-                file_type=e.file_type,
-                extracted_text=e.extracted_text or "",
-                adversarial_report=adv,
-                has_conflicts=len(e_confs) > 0,
-                conflicts_count=len(e_confs),
-                is_corroborated=False
-            )
-            # Update or create reliability
-            rel_rec = db.query(models.ReliabilityAssessment).filter(models.ReliabilityAssessment.evidence_id == e.id).first()
-            if not rel_rec:
-                rel_rec = models.ReliabilityAssessment(investigation_id=investigation_id, evidence_id=e.id, score=rel_res["score"], category=rel_res["category"])
-                db.add(rel_rec)
-            rel_rec.score = rel_res["score"]
-            rel_rec.category = rel_res["category"]
-            rel_rec.provenance_notes = rel_res["provenance_notes"]
-            rel_rec.authenticity_indicators_json = json.dumps(rel_res["authenticity_indicators"])
-            rel_rec.risk_factors_json = json.dumps(rel_res["risk_factors"])
-            rel_rec.missing_verification_json = json.dumps(rel_res["missing_verification"])
-            rel_rec.recommended_actions_json = json.dumps(rel_res["recommended_actions"])
-        db.commit()
-
         saved_evidence.append({"id": ev.id, "filename": ev.filename, "evidence_code": ev.evidence_code})
+
+    # Run conflict re-evaluation once across all investigation evidence
+    all_inv_claims = db.query(models.ExtractedClaim).filter(models.ExtractedClaim.investigation_id == investigation_id).all()
+    all_inv_ev = db.query(models.EvidenceFile).filter(models.EvidenceFile.investigation_id == investigation_id).all()
+    ev_map = {e.id: {"filename": e.filename, "evidence_code": e.evidence_code} for e in all_inv_ev}
+    
+    claims_dict_list = [{
+        "id": c.id,
+        "evidence_id": c.evidence_id,
+        "evidence_filename": ev_map.get(c.evidence_id, {}).get("filename"),
+        "claim_code": c.claim_code,
+        "text": c.text,
+        "claim_type": c.claim_type,
+        "subject": c.subject,
+        "predicate": c.predicate,
+        "quantity_val": c.quantity_val,
+        "quantity_unit": c.quantity_unit,
+        "quantity_action": c.quantity_action,
+        "date_val": c.date_val,
+        "location_val": c.location_val,
+        "page_or_location": c.page_or_location
+    } for c in all_inv_claims]
+
+    conflicts = detect_conflicts_between_claims(claims_dict_list, ev_map)
+    
+    # Clear existing auto conflicts and recreate
+    db.query(models.Conflict).filter(models.Conflict.investigation_id == investigation_id).delete()
+    for cf in conflicts:
+        cnf_obj = models.Conflict(
+            investigation_id=investigation_id,
+            conflict_code=cf["conflict_code"],
+            claim_a_id=cf["claim_a_id"],
+            claim_b_id=cf["claim_b_id"],
+            evidence_a_id=cf["evidence_a_id"],
+            evidence_b_id=cf["evidence_b_id"],
+            conflict_type=cf["conflict_type"],
+            severity=cf["severity"],
+            explanation=cf["explanation"],
+            discrepancy_details=json.dumps(cf.get("discrepancy_details", {})),
+            verification_status="DETECTED"
+        )
+        db.add(cnf_obj)
+    db.commit()
+
+    # Compute reliability scores for each file
+    for e in all_inv_ev:
+        e_confs = [c for c in conflicts if c["evidence_a_id"] == e.id or c["evidence_b_id"] == e.id]
+        meta = json.loads(e.metadata_json) if e.metadata_json else {}
+        adv = json.loads(e.adversarial_report_json) if e.adversarial_report_json else {}
+        rel_res = evaluate_evidence_reliability(
+            evidence_meta=meta,
+            file_type=e.file_type,
+            extracted_text=e.extracted_text or "",
+            adversarial_report=adv,
+            has_conflicts=len(e_confs) > 0,
+            conflicts_count=len(e_confs),
+            is_corroborated=False
+        )
+        rel_rec = db.query(models.ReliabilityAssessment).filter(models.ReliabilityAssessment.evidence_id == e.id).first()
+        if not rel_rec:
+            rel_rec = models.ReliabilityAssessment(investigation_id=investigation_id, evidence_id=e.id, score=rel_res["score"], category=rel_res["category"])
+            db.add(rel_rec)
+        rel_rec.score = rel_res["score"]
+        rel_rec.category = rel_res["category"]
+        rel_rec.provenance_notes = rel_res["provenance_notes"]
+        rel_rec.authenticity_indicators_json = json.dumps(rel_res["authenticity_indicators"])
+        rel_rec.risk_factors_json = json.dumps(rel_res["risk_factors"])
+        rel_rec.missing_verification_json = json.dumps(rel_res["missing_verification"])
+        rel_rec.recommended_actions_json = json.dumps(rel_res["recommended_actions"])
+    db.commit()
+
+    return {"message": f"Successfully processed {len(saved_evidence)} evidence file(s)", "evidence": saved_evidence}
 
     return {"message": f"Successfully processed {len(saved_evidence)} evidence file(s)", "evidence": saved_evidence}
 

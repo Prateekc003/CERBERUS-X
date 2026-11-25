@@ -336,6 +336,41 @@ def detect_conflicts_between_claims(claims: List[Dict[str, Any]], evidence_map: 
                             })
                             conflict_count += 1
 
+                    # CASE 6: Claimed Delivered vs Inventory Recorded (1000 claimed delivered vs 750 recorded)
+                    elif (actA == "delivered" and actB == "recorded") or (actA == "recorded" and actB == "delivered"):
+                        seen_file_pair_categories.add(pair_key)
+                        deliv_qty = qA if actA == "delivered" else qB
+                        rec_qty = qB if actA == "delivered" else qA
+                        deliv_doc = evA_name if actA == "delivered" else evB_name
+                        rec_doc = evB_name if actA == "delivered" else evA_name
+
+                        if deliv_qty != rec_qty:
+                            inv_deficit = deliv_qty - rec_qty
+                            conflicts.append({
+                                "conflict_code": f"CNF-{conflict_count:03d}",
+                                "claim_a_id": cA["id"],
+                                "claim_b_id": cB["id"],
+                                "evidence_a_id": cA["evidence_id"],
+                                "evidence_b_id": cB["evidence_id"],
+                                "claim_a_text": cA["text"],
+                                "claim_b_text": cB["text"],
+                                "evidence_a_filename": evA_name,
+                                "evidence_b_filename": evB_name,
+                                "conflict_type": "QUANTITY_DISCREPANCY",
+                                "severity": "HIGH",
+                                "classification": "Confirmed Conflict",
+                                "explanation": f"Inventory ledger shortfall: Official report ({deliv_doc}) affirms {deliv_qty:.0f} medical kits delivered, but local inventory spreadsheet ({rec_doc}) accounts for only {rec_qty:.0f} recorded in stock ({inv_deficit:.0f} kits unaccounted for in inventory).",
+                                "discrepancy_details": {
+                                    "claimed_delivered": deliv_qty,
+                                    "recorded_inventory": rec_qty,
+                                    "unaccounted_inventory": inv_deficit,
+                                    "category": "INVENTORY_LEDGER_DEFICIT",
+                                    "classification": "Confirmed Conflict"
+                                },
+                                "verification_status": "DETECTED"
+                            })
+                            conflict_count += 1
+
             # Compare DATE claims for temporal anomalies
             dateA = cA.get("date_val")
             dateB = cB.get("date_val")

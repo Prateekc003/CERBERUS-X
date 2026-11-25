@@ -1,0 +1,8 @@
+DELIVERY RECEIPT & PHYSICAL DOCK INTAKE SLIP
+RECEIVING DOCK: Regional Hub Alpha, Bay 4
+DATE: March 16, 2026
+CARRIER: Apex Logistics (Truck #TRK-882)
+PHYSICAL COUNT: 800 medical kits were received.
+REMARKS: Pallet count short of manifest estimate. 800 kits received in good condition.
+SIGNATURE: Inspector Marcus Vance
+STATUS: Verified received count: 800 kits.

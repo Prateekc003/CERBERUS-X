@@ -1,0 +1,4 @@
+Asset_ID,Item_Category,Location,Quantity_Recorded,Audit_Status,Auditor_Notes
+MED-9021-A,Medical Kits,Regional Hub Alpha,750,Recorded,750 medical kits recorded in stock during physical bin count
+MED-9021-B,Emergency Trauma Packs,Regional Hub Alpha,120,Recorded,Complete lot recorded
+MED-9021-C,Surgical Gloves,Regional Hub Alpha,3000,Recorded,Standard count recorded
