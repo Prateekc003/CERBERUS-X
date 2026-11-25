@@ -654,6 +654,9 @@ export const App: React.FC = () => {
             systemStatus={systemStatus}
             onRunDemoSeed={handleRunDemoSeed}
             loading={loading}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onNavigate={(tab) => setActiveTab(tab)}
           />
         )}
 
