@@ -213,22 +213,20 @@ export const AuthPage: React.FC = () => {
               />
             </div>
 
-            {/* Shield Checkmark Icon + Brand Header */}
+            {/* Custom Brand Logo + Brand Header */}
             <div className="flex flex-col items-center text-center mb-7">
-              <div className="mb-2.5 text-white">
-                {/* Shield with Checkmark matching reference image */}
-                <svg
-                  className="w-10 h-10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 2.5L4.5 5.8v5.5c0 4.9 3.2 9.4 7.5 10.7 4.3-1.3 7.5-5.8 7.5-10.7V5.8L12 2.5z" />
-                  <path d="M9 12.2l2.1 2.1 4.2-4.3" />
-                </svg>
+              <div className="mb-2.5 flex items-center justify-center">
+                <img
+                  src="/logo.png"
+                  alt="CERBERUS-X Logo"
+                  className="w-16 h-16 object-contain rounded-2xl drop-shadow-[0_0_20px_rgba(255,255,255,0.18)]"
+                  style={{
+                    maskImage:
+                      'radial-gradient(circle at center, black 62%, transparent 98%)',
+                    WebkitMaskImage:
+                      'radial-gradient(circle at center, black 62%, transparent 98%)',
+                  }}
+                />
               </div>
               <h1 className="text-[26px] font-bold tracking-[0.06em] text-white leading-tight">
                 CERBERUS-X
