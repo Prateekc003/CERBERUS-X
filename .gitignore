@@ -4,6 +4,11 @@ __pycache__/
 *$py.class
 backend/venv/
 .env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 
 # Node & Frontend
 frontend/node_modules/

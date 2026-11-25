@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Loader2, MailCheck } from 'lucide-react';
 import { api } from './api/client';
 import {
   Investigation,
@@ -12,6 +13,12 @@ import {
   ReportData
 } from './types';
 
+import { useAuth } from './context/AuthContext';
+import {
+  saveInvestigationToFirestore,
+  getUserInvestigationsFromFirestore,
+} from './firebase/firestore';
+import { AuthPage } from './components/AuthPage';
 import { Navigation, NavTab } from './components/Navigation';
 import { DashboardOverview } from './components/DashboardOverview';
 import { EvidenceUploadCenter } from './components/EvidenceUploadCenter';
@@ -27,6 +34,15 @@ import { EntityResolution } from './components/EntityResolution';
 import { InvestigationsView } from './components/InvestigationsView';
 
 export const App: React.FC = () => {
+  const {
+    user,
+    userProfile,
+    loading: authLoading,
+    logout,
+    resendVerificationEmail,
+    refreshAuthUser,
+  } = useAuth();
+
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [currentInvestigation, setCurrentInvestigation] = useState<Investigation | null>(null);
@@ -48,15 +64,34 @@ export const App: React.FC = () => {
   const [pendingAssistantQuery, setPendingAssistantQuery] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [errorNotification, setErrorNotification] = useState<string | null>(null);
+  const [verificationDismissed, setVerificationDismissed] = useState(false);
+  const [verificationMsg, setVerificationMsg] = useState<string | null>(null);
 
-  // Load initial system status and investigations
-  const loadInitialData = async () => {
+  // Load initial system status and investigations only when authenticated
+  const loadInitialData = useCallback(async () => {
+    if (!user) return;
     try {
-      const [sys, invs] = await Promise.all([
+      const [sys, invs, fsInvs] = await Promise.all([
         api.getSystemStatus(),
         api.getInvestigations(),
+        getUserInvestigationsFromFirestore(user.uid).catch(() => []),
       ]);
       setSystemStatus(sys);
+
+      // Sync existing investigations to Firestore for this user if none saved yet
+      if (fsInvs.length === 0 && invs.length > 0) {
+        await Promise.all(
+          invs.map((inv) =>
+            saveInvestigationToFirestore(user.uid, {
+              investigationId: String(inv.id),
+              investigationName: inv.title,
+              investigationStatus: inv.status,
+              uploadedEvidenceReferences: [],
+            }).catch(() => undefined)
+          )
+        );
+      }
+
       setInvestigations(invs);
       if (invs.length > 0) {
         setCurrentInvestigation(invs[0]);
@@ -65,15 +100,28 @@ export const App: React.FC = () => {
       console.error('Failed to load initial data:', err);
       setErrorNotification('Unable to connect to Cerberus-X backend server.');
     }
-  };
+  }, [user]);
 
   useEffect(() => {
-    loadInitialData();
-  }, []);
+    if (user) {
+      loadInitialData();
+    } else {
+      setInvestigations([]);
+      setCurrentInvestigation(null);
+      setEvidence([]);
+      setClaims([]);
+      setEntities([]);
+      setConflicts([]);
+      setReliability([]);
+      setGraphData(null);
+      setDashboardData(null);
+      setReportData(null);
+    }
+  }, [user, loadInitialData]);
 
   // Fetch all data for the active investigation
   const refreshCaseData = useCallback(async () => {
-    if (!currentInvestigation) return;
+    if (!currentInvestigation || !user) return;
     setLoading(true);
     try {
       const invId = currentInvestigation.id;
@@ -94,18 +142,28 @@ export const App: React.FC = () => {
       setReliability(relList);
       setGraphData(gData);
       setDashboardData(dData);
+
+      // Sync evidence references to Firestore investigation doc
+      saveInvestigationToFirestore(user.uid, {
+        investigationId: String(currentInvestigation.id),
+        investigationName: currentInvestigation.title,
+        investigationStatus: currentInvestigation.status,
+        uploadedEvidenceReferences: evList.map(
+          (e) => `${e.evidence_code}:${e.filename}`
+        ),
+      }).catch(() => undefined);
     } catch (err: any) {
       console.error('Failed to refresh case data:', err);
     } finally {
       setLoading(false);
     }
-  }, [currentInvestigation]);
+  }, [currentInvestigation, user]);
 
   useEffect(() => {
-    if (currentInvestigation) {
+    if (currentInvestigation && user) {
       refreshCaseData();
     }
-  }, [currentInvestigation, refreshCaseData]);
+  }, [currentInvestigation, user, refreshCaseData]);
 
   // Demo Seed Handler
   const handleRunDemoSeed = async () => {
@@ -117,6 +175,14 @@ export const App: React.FC = () => {
       const demo = invs.find((i) => i.case_code === 'INV-MED-2026-001') || invs[0];
       if (demo) {
         setCurrentInvestigation(demo);
+        if (user) {
+          saveInvestigationToFirestore(user.uid, {
+            investigationId: String(demo.id),
+            investigationName: demo.title,
+            investigationStatus: demo.status,
+            uploadedEvidenceReferences: [],
+          }).catch(() => undefined);
+        }
       }
       setActiveTab('home');
     } catch (err: any) {
@@ -134,6 +200,14 @@ export const App: React.FC = () => {
     setLoading(true);
     try {
       const created = await api.createInvestigation(newCaseTitle.trim(), newCaseDesc.trim());
+      if (user) {
+        await saveInvestigationToFirestore(user.uid, {
+          investigationId: String(created.id),
+          investigationName: created.title,
+          investigationStatus: created.status || 'ACTIVE',
+          uploadedEvidenceReferences: [],
+        }).catch(() => undefined);
+      }
       setInvestigations((prev) => [created, ...prev]);
       setCurrentInvestigation(created);
       setIsCreatingCase(false);
@@ -243,6 +317,39 @@ export const App: React.FC = () => {
     setActiveTab('assistant');
   };
 
+  // Loading gate while Firebase resolves persistent session
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#07080a] flex flex-col items-center justify-center text-white space-y-4">
+        <img
+          src="/logo.png"
+          alt="CERBERUS-X"
+          className="w-14 h-14 object-contain rounded-xl opacity-90 animate-pulse"
+        />
+        <div className="flex items-center space-x-2 text-xs text-slate-400 font-mono tracking-wider">
+          <Loader2 className="w-4 h-4 animate-spin text-white" />
+          <span>AUTHENTICATING SESSION...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Protected Route Gate: redirect unauthenticated users to Login Page
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  const displayUserName =
+    userProfile?.fullName ||
+    user.displayName ||
+    user.email?.split('@')[0] ||
+    'Investigator';
+
+  const needsEmailVerification =
+    !user.emailVerified &&
+    user.providerData?.[0]?.providerId === 'password' &&
+    !verificationDismissed;
+
   return (
     <div style={{ backgroundColor: '#0d0d12', minHeight: '100vh' }} className="min-h-screen bg-[#0d0d12] flex font-sans text-slate-200 antialiased selection:bg-slate-700 selection:text-white">
       {/* Sleek Sidebar matching Image */}
@@ -253,11 +360,60 @@ export const App: React.FC = () => {
           setPendingAssistantQuery('');
         }}
         onNewInvestigation={() => setIsCreatingCase(true)}
-        userName="Raghavendra"
+        userName={displayUserName}
+        userEmail={user.email || undefined}
+        userPhotoURL={user.photoURL}
+        onLogout={async () => {
+          await logout();
+          setActiveTab('home');
+        }}
       />
 
       {/* Main App Content Viewport */}
       <main style={{ backgroundColor: '#0d0d12' }} className="flex-1 overflow-y-auto bg-[#0d0d12] min-h-screen flex flex-col justify-between">
+        {needsEmailVerification && (
+          <div className="mx-6 mt-5 p-3.5 rounded-xl bg-amber-950/35 border border-amber-900/50 text-amber-200 text-xs flex flex-wrap justify-between items-center gap-3 shadow">
+            <div className="flex items-center space-x-2.5">
+              <MailCheck className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                Please verify your email address (<strong>{user.email}</strong>).{' '}
+                {verificationMsg && (
+                  <span className="text-emerald-300 ml-1">{verificationMsg}</span>
+                )}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2.5">
+              <button
+                onClick={async () => {
+                  try {
+                    await resendVerificationEmail();
+                    setVerificationMsg('Verification email resent!');
+                  } catch (err: any) {
+                    setVerificationMsg(err?.message || 'Unable to resend.');
+                  }
+                }}
+                className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-medium transition-colors"
+              >
+                Resend Email
+              </button>
+              <button
+                onClick={async () => {
+                  await refreshAuthUser();
+                }}
+                className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+              >
+                I've Verified
+              </button>
+              <button
+                onClick={() => setVerificationDismissed(true)}
+                className="text-amber-400 hover:text-white px-1"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {errorNotification && (
           <div className="m-6 p-4 rounded-xl bg-rose-950/40 border border-rose-900/60 text-rose-300 text-xs flex justify-between items-center shadow-lg">
             <span>{errorNotification}</span>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Home,
   Plus,
@@ -12,7 +12,8 @@ import {
   FileText,
   Settings,
   SquarePen,
-  ChevronDown
+  ChevronDown,
+  LogOut
 } from 'lucide-react';
 
 export type NavTab =
@@ -33,14 +34,21 @@ interface NavigationProps {
   onTabChange: (tab: NavTab) => void;
   onNewInvestigation?: () => void;
   userName?: string;
+  userEmail?: string;
+  userPhotoURL?: string | null;
+  onLogout?: () => Promise<void> | void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
   activeTab,
   onTabChange,
   onNewInvestigation,
-  userName = 'Raghavendra',
+  userName = 'Investigator',
+  userEmail,
+  userPhotoURL,
+  onLogout,
 }) => {
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   // Top main nav group
   const primaryItems = [
     { id: 'home' as NavTab, label: 'Home', icon: Home },
@@ -203,20 +211,60 @@ export const Navigation: React.FC<NavigationProps> = ({
       </div>
 
       {/* User Profile at Bottom */}
-      <div style={{ borderColor: '#1f1f28' }} className="p-3 border-t border-[#1f1f28]">
-        <div className="flex items-center justify-between px-2 py-1.5 rounded-xl hover:bg-[#1a1a22] cursor-pointer transition-colors">
-          <div className="flex items-center space-x-2.5">
-            <div
-              style={{ backgroundColor: '#22222d', borderColor: '#2b2b38' }}
-              className="w-7 h-7 rounded-full bg-[#22222d] text-slate-200 font-semibold text-xs flex items-center justify-center border border-[#2b2b38]"
-            >
-              {userName.charAt(0)}
+      <div style={{ borderColor: '#1f1f28' }} className="p-3 border-t border-[#1f1f28] relative">
+        {profileMenuOpen && (
+          <div className="mb-2 p-2.5 rounded-xl bg-[#181820] border border-[#2a2a38] shadow-xl space-y-2 text-xs">
+            <div className="px-1.5 pb-2 border-b border-[#252532]">
+              <div className="font-semibold text-white truncate">{userName}</div>
+              {userEmail && (
+                <div className="text-[11px] text-slate-400 truncate">{userEmail}</div>
+              )}
             </div>
-            <span className="text-xs font-medium text-slate-200 truncate max-w-[120px]">
-              {userName}
-            </span>
+            {onLogout && (
+              <button
+                onClick={() => {
+                  setProfileMenuOpen(false);
+                  onLogout();
+                }}
+                className="w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg text-rose-300 hover:bg-rose-950/50 hover:text-rose-200 transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+            )}
           </div>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+        )}
+
+        <div
+          onClick={() => setProfileMenuOpen((prev) => !prev)}
+          className="flex items-center justify-between px-2 py-1.5 rounded-xl hover:bg-[#1a1a22] cursor-pointer transition-colors"
+        >
+          <div className="flex items-center space-x-2.5 min-w-0">
+            {userPhotoURL ? (
+              <img
+                src={userPhotoURL}
+                alt={userName}
+                className="w-7 h-7 rounded-full object-cover border border-[#2b2b38] shrink-0"
+              />
+            ) : (
+              <div
+                style={{ backgroundColor: '#22222d', borderColor: '#2b2b38' }}
+                className="w-7 h-7 rounded-full bg-[#22222d] text-slate-200 font-semibold text-xs flex items-center justify-center border border-[#2b2b38] shrink-0"
+              >
+                {userName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <span className="text-xs font-medium text-slate-200 truncate block max-w-[125px]">
+                {userName}
+              </span>
+            </div>
+          </div>
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-slate-500 transition-transform ${
+              profileMenuOpen ? 'rotate-180' : ''
+            }`}
+          />
         </div>
       </div>
     </nav>
