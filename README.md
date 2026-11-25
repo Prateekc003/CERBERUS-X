@@ -12,6 +12,10 @@
 
 ## 2. Core Architecture & Technology Stack
 
+<p align="center">
+  <img src="docs/architecture.png" alt="CERBERUS-X System Architecture" width="100%" />
+</p>
+
 ```
                           ┌────────────────────────────────────────────────────────┐
                           │            CERBERUS-X ENTERPRISE FRONTEND              │
