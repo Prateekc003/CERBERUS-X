@@ -389,7 +389,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main App Content Viewport */}
-      <main className="flex-1 overflow-y-auto bg-[#0d0d12] min-h-screen flex flex-col justify-between">
+      <main className={`flex-1 bg-[#0d0d12] flex flex-col ${activeTab === 'graph' ? 'h-screen overflow-hidden' : 'min-h-screen overflow-y-auto'}`}>
         {/* 1. Home Screen (Matches User's Reference Image & 8 Cards Hub) */}
         {activeTab === 'home' && (
           <DashboardOverview

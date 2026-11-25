@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
   Controls,
   Background,
   MiniMap,
@@ -18,6 +20,7 @@ import {
   Image as ImageIcon,
   Box,
   RotateCcw,
+  Maximize2,
   MapPin,
   Building,
   User,
@@ -149,26 +152,54 @@ const CustomNode: React.FC<NodeProps> = ({ data, selected }) => {
   );
 };
 
-export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ graphData, onRefresh }) => {
+export const KnowledgeGraphContent: React.FC<KnowledgeGraphProps> = ({ graphData, onRefresh }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
+  const { fitView } = useReactFlow();
 
   const nodeTypes = useMemo(() => ({ customNode: CustomNode }), []);
 
+  // Update nodes and edges when graphData updates, and auto-fit to screen
   useEffect(() => {
-    if (graphData && graphData.nodes) {
+    if (graphData && graphData.nodes && graphData.nodes.length > 0) {
       setNodes(graphData.nodes as any);
-      setEdges(graphData.edges as any);
+      setEdges((graphData.edges || []) as any);
+
+      // Auto-fit to viewport once nodes are set
+      const timer = setTimeout(() => {
+        fitView({ padding: 0.12, duration: 350 });
+      }, 60);
+      return () => clearTimeout(timer);
     }
-  }, [graphData, setNodes, setEdges]);
+  }, [graphData, setNodes, setEdges, fitView]);
+
+  // Re-fit view automatically on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      fitView({ padding: 0.12, duration: 200 });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [fitView]);
 
   const onNodeClick = useCallback((_: any, node: any) => {
     setSelectedNode(node);
   }, []);
 
+  const handleFitToScreen = useCallback(() => {
+    fitView({ padding: 0.12, duration: 400 });
+  }, [fitView]);
+
+  const handleResetLayout = useCallback(() => {
+    onRefresh();
+    setTimeout(() => {
+      fitView({ padding: 0.12, duration: 400 });
+    }, 200);
+  }, [onRefresh, fitView]);
+
   return (
-    <div className="p-6 md:p-8 space-y-4 max-w-7xl mx-auto h-[calc(100vh-4.5rem)] flex flex-col text-slate-200">
+    <div className="w-full h-full flex-1 flex flex-col min-h-0 p-4 md:p-6 text-slate-200">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#22222d] gap-3 shrink-0">
         <div>
@@ -181,18 +212,28 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ graphData, onRef
           </p>
         </div>
 
-        <button
-          onClick={onRefresh}
-          className="text-xs px-3 py-1.5 rounded-lg border border-[#2a2a38] hover:bg-[#1f1f2b] text-slate-300 font-mono flex items-center space-x-1.5 transition-colors"
-        >
-          <RotateCcw className="w-3 h-3" />
-          <span>Reset Layout</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleFitToScreen}
+            className="text-xs px-3 py-1.5 rounded-lg border border-[#2a2a38] bg-[#14141d] hover:bg-[#1f1f2b] text-slate-200 font-mono flex items-center space-x-1.5 transition-colors shadow-sm"
+            title="Fit graph to current screen viewport"
+          >
+            <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
+            <span>Fit to Screen</span>
+          </button>
+          <button
+            onClick={handleResetLayout}
+            className="text-xs px-3 py-1.5 rounded-lg border border-[#2a2a38] hover:bg-[#1f1f2b] text-slate-300 font-mono flex items-center space-x-1.5 transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>Reset Layout</span>
+          </button>
+        </div>
       </div>
 
-      {/* Main Graph Canvas */}
-      <div className="flex-1 border border-[#22222d] rounded-2xl overflow-hidden relative bg-[#090a10] flex shadow-2xl">
-        <div className="flex-1 h-full w-full">
+      {/* Main Graph Canvas - 100% full width and remaining height */}
+      <div className="flex-1 w-full min-h-0 mt-3 border border-[#22222d] rounded-2xl overflow-hidden relative bg-[#090a10] flex shadow-2xl">
+        <div className="flex-1 h-full w-full relative">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -201,9 +242,12 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ graphData, onRef
             nodeTypes={nodeTypes}
             onNodeClick={onNodeClick}
             fitView
-            fitViewOptions={{ padding: 0.2 }}
-            minZoom={0.3}
-            maxZoom={2}
+            fitViewOptions={{ padding: 0.12, duration: 400 }}
+            minZoom={0.2}
+            maxZoom={2.5}
+            onInit={(instance) => {
+              instance.fitView({ padding: 0.12 });
+            }}
           >
             <Background color="#161826" gap={24} size={1} />
             <Controls className="!bg-[#14141b] !border !border-[#2a2a38] !text-slate-200 shadow-xl rounded-lg" />
@@ -281,5 +325,13 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ graphData, onRef
         )}
       </div>
     </div>
+  );
+};
+
+export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = (props) => {
+  return (
+    <ReactFlowProvider>
+      <KnowledgeGraphContent {...props} />
+    </ReactFlowProvider>
   );
 };
