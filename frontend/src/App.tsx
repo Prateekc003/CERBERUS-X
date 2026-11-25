@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, MailCheck } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { api } from './api/client';
 import {
   Investigation,
@@ -40,8 +40,6 @@ export const App: React.FC = () => {
     userProfile,
     loading: authLoading,
     logout,
-    resendVerificationEmail,
-    refreshAuthUser,
   } = useAuth();
 
   const [activeTab, setActiveTab] = useState<NavTab>('home');
@@ -65,8 +63,6 @@ export const App: React.FC = () => {
   const [pendingAssistantQuery, setPendingAssistantQuery] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [errorNotification, setErrorNotification] = useState<string | null>(null);
-  const [verificationDismissed, setVerificationDismissed] = useState(false);
-  const [verificationMsg, setVerificationMsg] = useState<string | null>(null);
   const [showAccountInfo, setShowAccountInfo] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('cerberus_theme');
@@ -85,6 +81,13 @@ export const App: React.FC = () => {
       document.documentElement.classList.remove('light-mode');
     }
   }, [theme, user]);
+
+  useEffect(() => {
+    if (errorNotification) {
+      const timer = setTimeout(() => setErrorNotification(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorNotification]);
 
   // Load initial system status and investigations only when authenticated
   const loadInitialData = useCallback(async () => {
@@ -116,8 +119,7 @@ export const App: React.FC = () => {
         setCurrentInvestigation(invs[0]);
       }
     } catch (err: any) {
-      console.error('Failed to load initial data:', err);
-      setErrorNotification('Unable to connect to Cerberus-X backend server.');
+      console.warn('Initial data load notice:', err);
     }
   }, [user]);
 
@@ -364,11 +366,6 @@ export const App: React.FC = () => {
     user.email?.split('@')[0] ||
     'Investigator';
 
-  const needsEmailVerification =
-    !user.emailVerified &&
-    user.providerData?.[0]?.providerId === 'password' &&
-    !verificationDismissed;
-
   return (
     <div className="min-h-screen bg-[#0d0d12] flex font-sans text-slate-200 antialiased selection:bg-slate-700 selection:text-white">
       {/* Sleek Sidebar matching Image */}
@@ -393,61 +390,6 @@ export const App: React.FC = () => {
 
       {/* Main App Content Viewport */}
       <main className="flex-1 overflow-y-auto bg-[#0d0d12] min-h-screen flex flex-col justify-between">
-        {needsEmailVerification && (
-          <div className="mx-6 mt-5 p-3.5 rounded-xl bg-amber-950/35 border border-amber-900/50 text-amber-200 text-xs flex flex-wrap justify-between items-center gap-3 shadow">
-            <div className="flex items-center space-x-2.5">
-              <MailCheck className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>
-                Please verify your email address (<strong>{user.email}</strong>).{' '}
-                {verificationMsg && (
-                  <span className="text-emerald-300 ml-1">{verificationMsg}</span>
-                )}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2.5">
-              <button
-                onClick={async () => {
-                  try {
-                    await resendVerificationEmail();
-                    setVerificationMsg('Verification email resent!');
-                  } catch (err: any) {
-                    setVerificationMsg(err?.message || 'Unable to resend.');
-                  }
-                }}
-                className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-medium transition-colors"
-              >
-                Resend Email
-              </button>
-              <button
-                onClick={async () => {
-                  await refreshAuthUser();
-                }}
-                className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
-              >
-                I've Verified
-              </button>
-              <button
-                onClick={() => setVerificationDismissed(true)}
-                className="text-amber-400 hover:text-white px-1"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
-
-        {errorNotification && (
-          <div className="m-6 p-4 rounded-xl bg-rose-950/40 border border-rose-900/60 text-rose-300 text-xs flex justify-between items-center shadow-lg">
-            <span>{errorNotification}</span>
-            <button
-              onClick={() => setErrorNotification(null)}
-              className="font-bold text-rose-400 hover:text-white ml-4"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
         {/* 1. Home Screen (Matches User's Reference Image & 8 Cards Hub) */}
         {activeTab === 'home' && (
           <DashboardOverview
@@ -637,6 +579,19 @@ export const App: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Discreet floating action notification toast */}
+      {errorNotification && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md p-3.5 rounded-xl bg-[#1c1214] border border-rose-900/60 text-rose-300 text-xs flex items-center justify-between shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <span className="mr-3">{errorNotification}</span>
+          <button
+            onClick={() => setErrorNotification(null)}
+            className="text-rose-400 hover:text-white text-sm font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Modal: Account Information */}
       <AccountInfoModal
         isOpen={showAccountInfo}
