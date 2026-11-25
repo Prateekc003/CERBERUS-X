@@ -50,3 +50,16 @@
   background: #3b82f6 !important;
   border: 1.5px solid #17171e !important;
 }
+
+@keyframes cerberusFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.animate-cerberus-float {
+  animation: cerberusFloat 4.8s ease-in-out infinite;
+}
