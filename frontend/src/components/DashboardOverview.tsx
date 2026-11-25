@@ -10,9 +10,14 @@ import {
   Sun,
   Plus,
   ArrowUp,
-  Globe,
-  Type,
-  ChevronRight,
+  FileText,
+  FileCode,
+  Image as ImageIcon,
+  FileSpreadsheet,
+  Table,
+  Database,
+  Folder,
+  X,
   Upload,
 } from 'lucide-react';
 import { DashboardOverview as DashboardData, Investigation } from '../types';
@@ -35,10 +40,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onUploadFiles,
 }) => {
   const [promptInput, setPromptInput] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [showScreenshotSubmenu, setShowScreenshotSubmenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const attachMenuRef = useRef<HTMLDivElement>(null);
   const [acceptFilter, setAcceptFilter] = useState<string>('*');
 
@@ -47,7 +52,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (attachMenuRef.current && !attachMenuRef.current.contains(event.target as Node)) {
         setShowAttachMenu(false);
-        setShowScreenshotSubmenu(false);
       }
     };
     if (showAttachMenu) {
@@ -58,68 +62,128 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     };
   }, [showAttachMenu]);
 
-  const handlePromptSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!promptInput.trim()) return;
-    onAskQuery(promptInput.trim());
-    setPromptInput('');
+  // Valid supported extensions for CERBERUS-X
+  const VALID_EXTENSIONS = [
+    '.pdf',
+    '.txt',
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.xlsx',
+    '.xls',
+    '.csv',
+    '.json',
+    '.sql',
+    '.sqlite',
+    '.db',
+  ];
+
+  const isValidFile = (file: File) => {
+    const name = file.name.toLowerCase();
+    if (name.startsWith('.') || name === 'thumbs.db') return false;
+    return VALID_EXTENSIONS.some((ext) => name.endsWith(ext));
   };
 
-  const handleTriggerUpload = (filter: string = '*') => {
+  const addFiles = (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const validFiles = fileArray.filter(isValidFile);
+    if (validFiles.length > 0) {
+      setAttachedFiles((prev) => {
+        const existingKeys = new Set(prev.map((f) => `${f.name}_${f.size}`));
+        const uniqueNew = validFiles.filter((f) => !existingKeys.has(`${f.name}_${f.size}`));
+        return [...prev, ...uniqueNew];
+      });
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePromptSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = promptInput.trim();
+    if (!query && attachedFiles.length === 0) return;
+
+    if (attachedFiles.length > 0 && onUploadFiles) {
+      const dt = new DataTransfer();
+      attachedFiles.forEach((f) => dt.items.add(f));
+      await onUploadFiles(dt.files);
+      setAttachedFiles([]);
+    }
+
+    if (query) {
+      onAskQuery(query);
+      setPromptInput('');
+    }
+  };
+
+  const handleTriggerUpload = (filter: string) => {
+    setShowAttachMenu(false);
     setAcceptFilter(filter);
     setTimeout(() => {
-      fileInputRef.current?.click();
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+        fileInputRef.current.click();
+      }
     }, 50);
   };
 
-  const handleCaptureScreenshot = async () => {
+  const handleTriggerFolder = () => {
     setShowAttachMenu(false);
-    setShowScreenshotSubmenu(false);
-    try {
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.play();
-        await new Promise((resolve) => {
-          video.onloadedmetadata = resolve;
-        });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth || 1920;
-        canvas.height = video.videoHeight || 1080;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        stream.getTracks().forEach((track) => track.stop());
-
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const file = new File([blob], `screenshot_${Date.now()}.png`, { type: 'image/png' });
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            if (onUploadFiles) {
-              onUploadFiles(dt.files);
-            }
-          }
-        }, 'image/png');
-      } else {
-        handleTriggerUpload('.png,.jpg,.jpeg');
+    setTimeout(() => {
+      if (folderInputRef.current) {
+        folderInputRef.current.value = '';
+        folderInputRef.current.click();
       }
-    } catch (err) {
-      console.warn('Screenshot capture fallback or cancelled:', err);
-    }
+    }, 50);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      if (onUploadFiles) {
-        onUploadFiles(e.target.files);
-      } else {
-        onNavigate('repository');
-      }
-    }
-  };
+  const attachmentOptions = [
+    {
+      id: 'pdf',
+      label: 'PDF Documents',
+      icon: FileText,
+      action: () => handleTriggerUpload('.pdf'),
+    },
+    {
+      id: 'txt',
+      label: 'TXT Files',
+      icon: FileCode,
+      action: () => handleTriggerUpload('.txt'),
+    },
+    {
+      id: 'images',
+      label: 'Images (JPG, PNG)',
+      icon: ImageIcon,
+      action: () => handleTriggerUpload('.jpg,.jpeg,.png,.webp'),
+    },
+    {
+      id: 'excel',
+      label: 'Excel Spreadsheets (XLSX)',
+      icon: FileSpreadsheet,
+      action: () => handleTriggerUpload('.xlsx,.xls'),
+    },
+    {
+      id: 'csv',
+      label: 'CSV Tables',
+      icon: Table,
+      action: () => handleTriggerUpload('.csv'),
+    },
+    {
+      id: 'databases',
+      label: 'Databases (JSON, SQL, SQLite)',
+      icon: Database,
+      action: () => handleTriggerUpload('.json,.sql,.sqlite,.db'),
+    },
+    {
+      id: 'folders',
+      label: 'Folders',
+      icon: Folder,
+      action: () => handleTriggerFolder(),
+    },
+  ];
 
   const cards = [
     {
@@ -177,22 +241,29 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       style={{ backgroundColor: '#0d0d12' }}
       className="min-h-screen flex flex-col justify-between p-6 md:p-8 max-w-6xl mx-auto text-white bg-[#0d0d12]"
     >
-      {/* Hidden file input for quick attachments */}
+      {/* Hidden file input for file selection */}
       <input
         type="file"
         ref={fileInputRef}
-        onChange={handleFileChange}
+        onChange={(e) => {
+          if (e.target.files) addFiles(e.target.files);
+        }}
         accept={acceptFilter}
         multiple
         className="hidden"
       />
-      {/* Hidden camera input for taking photos */}
+
+      {/* Hidden folder input for directory selection */}
       <input
         type="file"
-        ref={cameraInputRef}
-        onChange={handleFileChange}
-        accept="image/*"
-        capture="environment"
+        ref={folderInputRef}
+        onChange={(e) => {
+          if (e.target.files) addFiles(e.target.files);
+        }}
+        // @ts-expect-error webkitdirectory is standard in browsers
+        webkitdirectory=""
+        directory=""
+        multiple
         className="hidden"
       />
 
@@ -212,7 +283,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* Center Section: Logo, Title, Tagline Pill & 8 Cards */}
+      {/* Center Section: Logo, Title, Tagline & 8 Cards */}
       <div className="flex-1 flex flex-col items-center justify-center my-6 space-y-6">
         {/* Brand Shield & Titles */}
         <div className="flex flex-col items-center text-center space-y-2">
@@ -255,13 +326,57 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* Bottom: ChatGPT-style AI Input Box with Floating Action Menu */}
+      {/* Bottom: ChatGPT-style AI Input Box with Custom Attachment Menu */}
       <div className="w-full max-w-4xl mx-auto pt-4 relative">
         <form
           onSubmit={handlePromptSubmit}
           style={{ backgroundColor: '#171720', borderColor: '#262633' }}
-          className="rounded-3xl border border-[#262633] p-4 flex flex-col space-y-3.5 shadow-2xl focus-within:border-slate-500 transition-colors relative"
+          className="rounded-3xl border border-[#262633] p-4 flex flex-col space-y-3 shadow-2xl focus-within:border-slate-500 transition-colors relative"
         >
+          {/* Attached Files Chips inside the Chat Input */}
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 pb-1">
+              {attachedFiles.map((file, idx) => {
+                const ext = file.name.split('.').pop()?.toLowerCase();
+                let ChipIcon = FileText;
+                if (['jpg', 'jpeg', 'png', 'webp'].includes(ext || '')) ChipIcon = ImageIcon;
+                else if (['xlsx', 'xls'].includes(ext || '')) ChipIcon = FileSpreadsheet;
+                else if (ext === 'csv') ChipIcon = Table;
+                else if (['json', 'sql', 'sqlite', 'db'].includes(ext || '')) ChipIcon = Database;
+                else if (ext === 'txt') ChipIcon = FileCode;
+
+                const sizeFormatted =
+                  file.size > 1024 * 1024
+                    ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+                    : `${Math.round(file.size / 1024)} KB`;
+
+                return (
+                  <div
+                    key={`${file.name}-${idx}`}
+                    style={{ backgroundColor: '#21212d', borderColor: '#2f2f3d' }}
+                    className="flex items-center space-x-2 px-2.5 py-1.5 rounded-xl border border-[#2f2f3d] bg-[#21212d] text-xs text-slate-200 animate-in fade-in"
+                  >
+                    <ChipIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="max-w-[140px] truncate font-medium text-slate-200">
+                      {file.name}
+                    </span>
+                    <span className="text-[10px] text-slate-400 shrink-0">
+                      {sizeFormatted}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(idx)}
+                      className="p-0.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                      title="Remove attachment"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Top text input with sleek ChatGPT-style typography */}
           <input
             type="text"
@@ -273,123 +388,44 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
           {/* Bottom actions & send button */}
           <div className="flex items-center justify-between pt-1 relative">
-            {/* Attachment triggers: [+] [🌐] [Aa] */}
-            <div className="relative flex items-center space-x-2" ref={attachMenuRef}>
+            {/* Attachment trigger: ONLY [+] button */}
+            <div className="relative flex items-center" ref={attachMenuRef}>
               {/* + Action Button */}
               <button
                 type="button"
                 onClick={() => setShowAttachMenu((prev) => !prev)}
-                title="Add attachment"
+                title="Attach evidence files or folders"
                 className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                   showAttachMenu
                     ? 'bg-[#3b3b48] text-white shadow-sm'
-                    : 'bg-[#2a2a35] hover:bg-[#343442] text-slate-200 hover:text-white'
+                    : 'bg-[#252530] hover:bg-[#30303e] text-slate-200 hover:text-white'
                 }`}
               >
                 <Plus className="w-4 h-4 stroke-[2]" />
-              </button>
-
-              {/* Globe Icon */}
-              <button
-                type="button"
-                title="Search web or intelligence sources"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#252530] transition-colors"
-              >
-                <Globe className="w-4 h-4 stroke-[1.75]" />
-              </button>
-
-              {/* Font / Reasoning Icon */}
-              <button
-                type="button"
-                title="Reasoning model / prompt formatting"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#252530] transition-colors"
-              >
-                <Type className="w-4 h-4 stroke-[1.75]" />
               </button>
 
               {/* Floating dark popup menu matching ChatGPT desktop */}
               {showAttachMenu && (
                 <div
                   style={{ backgroundColor: '#1e1e26', borderColor: '#2e2e3b' }}
-                  className="absolute bottom-full mb-3 left-0 w-52 bg-[#1e1e26] border border-[#2e2e3b] rounded-2xl p-1.5 shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-100"
+                  className="absolute bottom-full mb-3 left-0 w-64 bg-[#1e1e26] border border-[#2e2e3b] rounded-2xl p-1.5 shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-100"
                 >
-                  {/* Upload file */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAttachMenu(false);
-                      handleTriggerUpload('.pdf,.docx,.txt,.xlsx,.csv,.json');
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-normal text-slate-100 hover:bg-[#2b2b37] hover:text-white transition-colors"
-                  >
-                    Upload file
-                  </button>
-
-                  {/* Upload photo */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAttachMenu(false);
-                      handleTriggerUpload('.jpg,.jpeg,.png,.webp');
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-normal text-slate-100 hover:bg-[#2b2b37] hover:text-white transition-colors"
-                  >
-                    Upload photo
-                  </button>
-
-                  {/* Take screenshot with submenu */}
-                  <div
-                    className="relative"
-                    onMouseEnter={() => setShowScreenshotSubmenu(true)}
-                    onMouseLeave={() => setShowScreenshotSubmenu(false)}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleCaptureScreenshot()}
-                      className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-normal text-slate-100 hover:bg-[#2b2b37] hover:text-white transition-colors flex items-center justify-between"
-                    >
-                      <span>Take screenshot</span>
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
-                    </button>
-
-                    {showScreenshotSubmenu && (
-                      <div
-                        style={{ backgroundColor: '#1e1e26', borderColor: '#2e2e3b' }}
-                        className="absolute left-full top-0 ml-1.5 w-48 bg-[#1e1e26] border border-[#2e2e3b] rounded-2xl p-1.5 shadow-2xl z-50 animate-in fade-in duration-100"
-                      >
+                  <div className="flex flex-col space-y-0.5">
+                    {attachmentOptions.map((opt) => {
+                      const OptIcon = opt.icon;
+                      return (
                         <button
+                          key={opt.id}
                           type="button"
-                          onClick={() => handleCaptureScreenshot()}
-                          className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-200 hover:bg-[#2b2b37] hover:text-white transition-colors"
+                          onClick={opt.action}
+                          className="w-full text-left px-3 py-2 rounded-xl text-xs font-normal text-slate-100 hover:bg-[#282834] hover:text-white transition-colors flex items-center space-x-2.5"
                         >
-                          Capture screen
+                          <OptIcon className="w-4 h-4 text-slate-400 shrink-0 stroke-[1.5]" />
+                          <span className="truncate">{opt.label}</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAttachMenu(false);
-                            setShowScreenshotSubmenu(false);
-                            handleTriggerUpload('.png,.jpg,.jpeg');
-                          }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-200 hover:bg-[#2b2b37] hover:text-white transition-colors"
-                        >
-                          Upload screenshot file
-                        </button>
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
-
-                  {/* Take photo */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAttachMenu(false);
-                      cameraInputRef.current?.click();
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-normal text-slate-100 hover:bg-[#2b2b37] hover:text-white transition-colors"
-                  >
-                    Take photo
-                  </button>
                 </div>
               )}
             </div>
@@ -397,7 +433,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             {/* Send Button (White circle with up arrow) */}
             <button
               type="submit"
-              disabled={!promptInput.trim()}
+              disabled={!promptInput.trim() && attachedFiles.length === 0}
               className="w-7 h-7 rounded-full bg-white hover:bg-slate-200 text-black flex items-center justify-center transition-colors disabled:opacity-30 shrink-0 shadow"
             >
               <ArrowUp className="w-4 h-4 stroke-[2.5]" />
