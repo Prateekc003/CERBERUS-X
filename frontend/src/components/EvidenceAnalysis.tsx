@@ -49,6 +49,29 @@ export const EvidenceAnalysis: React.FC<EvidenceAnalysisProps> = ({
     setEditingConflictId(null);
   };
 
+  // Clean raw spreadsheet or scanner text for easy readability
+  const cleanClaimText = (text: string) => {
+    if (!text) return '';
+    if (text.includes('Auditor_Notes:')) {
+      return text.split('Auditor_Notes:')[1].trim();
+    }
+    if (text.startsWith('Row ') && text.includes(';')) {
+      const parts = text.split(';').map(p => p.trim());
+      const cleanParts = parts.filter(p => !p.startsWith('Asset_ID') && !p.startsWith('Row ') && !p.startsWith('Audit_Status'));
+      if (cleanParts.length > 0) return cleanParts.join(' • ');
+    }
+    return text.trim();
+  };
+
+  // Clean explanation text to remove parenthetical filenames
+  const cleanExplanation = (explanation: string) => {
+    if (!explanation) return '';
+    return explanation
+      .replace(/\([a-zA-Z0-9_\-\s\(\)]+\.(pdf|png|xlsx|docx|csv|txt)\)/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   return (
     <div className="p-7 space-y-6 max-w-7xl mx-auto text-slate-200">
       {/* Module Title Banner */}
@@ -144,16 +167,16 @@ export const EvidenceAnalysis: React.FC<EvidenceAnalysisProps> = ({
                     <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-900/60">
                       {c.conflict_code}
                     </span>
-                    <span className="font-mono text-xs font-semibold text-white">
-                      {c.conflict_type.replace(/_/g, ' ')}
+                    <span className="font-medium text-xs text-white">
+                      {c.conflict_type === 'QUANTITY_DISCREPANCY' ? 'Quantity Discrepancy' : c.conflict_type.replace(/_/g, ' ')}
                     </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase bg-dark-sidebar border border-dark-cardBorder text-slate-300">
-                      {c.severity} SEVERITY
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded font-medium bg-[#14141b] border border-[#2a2a38] text-slate-300">
+                      {c.severity} Severity
                     </span>
                   </div>
 
-                  <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold uppercase bg-accent-greenBadgeBg border border-accent-greenBadgeBorder text-accent-greenBadgeText">
-                    {c.verification_status.replace(/_/g, ' ')}
+                  <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-[#101017] border border-[#242432] text-slate-400">
+                    {c.verification_status === 'DETECTED' ? 'Under Review' : c.verification_status.replace(/_/g, ' ')}
                   </span>
                 </div>
 
@@ -161,36 +184,36 @@ export const EvidenceAnalysis: React.FC<EvidenceAnalysisProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-dark-sidebar border border-dark-cardBorder rounded-lg p-3.5 space-y-2">
                     <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                      <span className="font-bold text-white truncate max-w-[220px]">
+                      <span className="font-medium text-white truncate max-w-[220px]">
                         {c.evidence_a_filename}
                       </span>
-                      <span className="px-1.5 py-0.2 rounded bg-dark-card text-slate-300">Assertion A</span>
+                      <span className="text-slate-500">Source A</span>
                     </div>
                     <p className="text-xs text-slate-200 leading-relaxed italic bg-dark-card p-2.5 rounded border border-dark-borderSubtle">
-                      “{c.claim_a_text}”
+                      "{cleanClaimText(c.claim_a_text)}"
                     </p>
                   </div>
 
                   <div className="bg-dark-sidebar border border-dark-cardBorder rounded-lg p-3.5 space-y-2">
                     <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                      <span className="font-bold text-white truncate max-w-[220px]">
+                      <span className="font-medium text-white truncate max-w-[220px]">
                         {c.evidence_b_filename}
                       </span>
-                      <span className="px-1.5 py-0.2 rounded bg-dark-card text-slate-300">Assertion B</span>
+                      <span className="text-slate-500">Source B</span>
                     </div>
                     <p className="text-xs text-slate-200 leading-relaxed italic bg-dark-card p-2.5 rounded border border-dark-borderSubtle">
-                      “{c.claim_b_text}”
+                      "{cleanClaimText(c.claim_b_text)}"
                     </p>
                   </div>
                 </div>
 
                 {/* Explanation */}
-                <div className="p-3.5 bg-dark-sidebar border border-dark-borderSubtle rounded-lg text-xs">
+                <div className="p-3 bg-dark-sidebar border border-dark-borderSubtle rounded-lg text-xs">
                   <div className="flex items-center space-x-1.5 text-blue-400 font-semibold mb-1">
                     <AlertCircle className="w-3.5 h-3.5" />
-                    <span>Investigative Determination:</span>
+                    <span>Analysis:</span>
                   </div>
-                  <p className="text-slate-300 leading-relaxed">{c.explanation}</p>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">{cleanExplanation(c.explanation)}</p>
                 </div>
 
                 {/* Status Updater */}
@@ -206,11 +229,10 @@ export const EvidenceAnalysis: React.FC<EvidenceAnalysisProps> = ({
                           onChange={(e) => setResStatus(e.target.value)}
                           className="w-full text-xs bg-dark-input border border-dark-cardBorder text-white rounded p-1.5"
                         >
-                          <option value="DETECTED">DETECTED</option>
-                          <option value="UNDER_REVIEW">UNDER_REVIEW</option>
-                          <option value="VERIFIED_CONFLICT">VERIFIED_CONFLICT</option>
-                          <option value="RESOLVED_EXPLAINED">RESOLVED_EXPLAINED</option>
-                          <option value="DISMISSED">DISMISSED</option>
+                          <option value="DETECTED">Under Review</option>
+                          <option value="VERIFIED_CONFLICT">Verified Conflict</option>
+                          <option value="RESOLVED_EXPLAINED">Resolved / Explained</option>
+                          <option value="DISMISSED">Dismissed</option>
                         </select>
                       </div>
 
@@ -245,9 +267,9 @@ export const EvidenceAnalysis: React.FC<EvidenceAnalysisProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex justify-between items-center text-xs pt-2 border-t border-dark-borderSubtle">
+                  <div className="flex justify-between items-center text-xs pt-1 border-t border-dark-borderSubtle">
                     <span className="text-[11px] text-slate-400 font-mono">
-                      {c.resolution_notes ? `Note: ${c.resolution_notes}` : 'No investigator notes added'}
+                      {c.resolution_notes ? `Note: ${c.resolution_notes}` : ''}
                     </span>
                     <button
                       onClick={() => handleStartEditConflict(c)}

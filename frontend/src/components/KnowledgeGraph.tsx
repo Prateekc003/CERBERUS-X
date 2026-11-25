@@ -64,11 +64,13 @@ const CustomNode: React.FC<NodeProps> = ({ data, selected }) => {
     }
   }
 
+  const nodeWidth = nodeType === 'ENTITY' ? 'w-56' : 'w-64';
+
   return (
     <div
       className={`bg-dark-card rounded-xl border ${borderColor} ${
         selected ? 'ring-2 ring-blue-500 shadow-lg' : ''
-      } w-64 text-left transition-all overflow-hidden font-sans text-xs shadow-md`}
+      } ${nodeWidth} text-left transition-all overflow-hidden font-sans text-xs shadow-md`}
     >
       <Handle type="target" position={Position.Left} className="w-2 h-2" />
       <div className={`px-3 py-1.5 flex items-center justify-between font-mono text-[10px] ${headerBg}`}>
@@ -172,6 +174,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ graphData, onRef
             nodeTypes={nodeTypes}
             onNodeClick={onNodeClick}
             fitView
+            fitViewOptions={{ padding: 0.15 }}
             minZoom={0.2}
             maxZoom={2}
           >
@@ -184,7 +187,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ graphData, onRef
                 if (node.data.nodeType === 'ENTITY') return '#818cf8';
                 return '#64748b';
               }}
-              className="border border-dark-cardBorder rounded bg-dark-sidebar"
+              style={{ width: 130, height: 80 }}
+              className="!bg-[#14141b] !border !border-[#2a2a38] rounded-lg shadow-xl"
             />
           </ReactFlow>
 

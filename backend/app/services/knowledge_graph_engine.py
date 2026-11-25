@@ -1,6 +1,5 @@
 import networkx as nx
 from typing import Dict, Any, List
-import math
 
 def build_investigation_knowledge_graph(
     evidence_list: List[Dict[str, Any]],
@@ -10,7 +9,7 @@ def build_investigation_knowledge_graph(
 ) -> Dict[str, Any]:
     """
     Constructs a NetworkX directed graph connecting Documents, Claims, Entities, and Conflicts,
-    and returns a React Flow compatible payload with pre-arranged layout coordinates.
+    and returns a clean, spacious React Flow compatible layout.
     """
     G = nx.DiGraph()
 
@@ -21,8 +20,8 @@ def build_investigation_knowledge_graph(
             node_id,
             node_type="DOCUMENT",
             label=ev["filename"],
-            sublabel=f"Code: {ev.get('evidence_code', '')} | Type: {ev.get('file_type', '').upper()}",
-            category=ev.get("file_type", "").upper(),
+            sublabel=f"{ev.get('evidence_code', '')} • {ev.get('file_type', '').upper()}",
+            category="DOCUMENT",
             data={
                 "id": ev["id"],
                 "evidence_code": ev.get("evidence_code"),
@@ -35,32 +34,25 @@ def build_investigation_knowledge_graph(
             }
         )
 
-    # 2. Add Entity Nodes
-    for ent in entities_list:
-        node_id = f"ent_{ent['id']}"
-        G.add_node(
-            node_id,
-            node_type="ENTITY",
-            label=ent["name"],
-            sublabel=f"Type: {ent['entity_type']} | Mentions: {ent.get('mention_count', 1)}",
-            category=ent["entity_type"],
-            data={
-                "id": ent["id"],
-                "name": ent["name"],
-                "normalized_name": ent["normalized_name"],
-                "entity_type": ent["entity_type"],
-                "mention_count": ent.get("mention_count", 1)
-            }
-        )
-
-    # 3. Add Claim Nodes & MENTIONS edges
+    # 2. Add Claim Nodes
     for clm in claims_list:
         node_id = f"clm_{clm['id']}"
+        # Clean claim text snippet for sublabel
+        clean_text = clm["text"]
+        if "Auditor_Notes:" in clean_text:
+            clean_text = clean_text.split("Auditor_Notes:")[-1].strip()
+        elif "Row " in clean_text and ";" in clean_text:
+            parts = [p.strip() for p in clean_text.split(";") if "Quantity" in p or "Item" in p or "Audit" in p]
+            if parts:
+                clean_text = " • ".join(parts)
+        
+        display_sub = clean_text[:80] + ("..." if len(clean_text) > 80 else "")
+
         G.add_node(
             node_id,
             node_type="CLAIM",
-            label=f"{clm.get('claim_code', 'CLM')}: {clm.get('claim_type', 'CLAIM')}",
-            sublabel=clm["text"][:75] + ("..." if len(clm["text"]) > 75 else ""),
+            label=f"{clm.get('claim_code', 'CLM')}",
+            sublabel=display_sub,
             category=clm.get("claim_type", "CLAIM"),
             data={
                 "id": clm["id"],
@@ -74,26 +66,60 @@ def build_investigation_knowledge_graph(
             }
         )
 
-        # Edge from Claim to Document (BELONGS_TO)
+        # Single directed edge: Document -> Claim
         doc_node_id = f"doc_{clm['evidence_id']}"
         if G.has_node(doc_node_id):
-            G.add_edge(node_id, doc_node_id, edge_type="BELONGS_TO", label="BELONGS_TO")
-            G.add_edge(doc_node_id, node_id, edge_type="CONTAINS", label="CONTAINS")
+            G.add_edge(doc_node_id, node_id, edge_type="CONTAINS")
 
-        # Connect Claim to matching Entities (MENTIONS)
-        for ent in entities_list:
-            ent_node_id = f"ent_{ent['id']}"
+    # 3. Add Entity Nodes (Prioritize entities referenced in claims or with multiple mentions)
+    referenced_entities = []
+    other_entities = []
+
+    claims_text_corpus = " ".join([c["text"].lower() for c in claims_list])
+
+    for ent in entities_list:
+        ent_name_lower = ent["name"].lower()
+        if ent_name_lower in claims_text_corpus or ent.get("mention_count", 1) > 1:
+            referenced_entities.append(ent)
+        else:
+            other_entities.append(ent)
+
+    # Cap total displayed entities to keep graph balanced and non-overwhelming
+    selected_entities = (referenced_entities + other_entities)[:18]
+
+    for ent in selected_entities:
+        node_id = f"ent_{ent['id']}"
+        G.add_node(
+            node_id,
+            node_type="ENTITY",
+            label=ent["name"],
+            sublabel=f"{ent['entity_type']}",
+            category=ent["entity_type"],
+            data={
+                "id": ent["id"],
+                "name": ent["name"],
+                "normalized_name": ent["normalized_name"],
+                "entity_type": ent["entity_type"],
+                "mention_count": ent.get("mention_count", 1)
+            }
+        )
+
+        # Connect Claim to matching Entity (single directed edge: Claim -> Entity)
+        for clm in claims_list:
+            clm_node_id = f"clm_{clm['id']}"
             if ent["name"].lower() in clm["text"].lower() or ent["normalized_name"] in clm["text"].lower():
-                G.add_edge(node_id, ent_node_id, edge_type="MENTIONS", label="MENTIONS")
-                G.add_edge(doc_node_id, ent_node_id, edge_type="MENTIONS", label="MENTIONS")
+                if G.has_node(clm_node_id) and G.has_node(node_id):
+                    G.add_edge(clm_node_id, node_id, edge_type="MENTIONS")
 
-    # 4. Add Conflict Edges & Nodes (CONTRADICTS)
+    # 4. Add Conflict Relationships (CONTRADICTS)
+    conflict_claim_ids = set()
     for cnf in conflicts_list:
         clm_a_node = f"clm_{cnf['claim_a_id']}"
         clm_b_node = f"clm_{cnf['claim_b_id']}"
 
         if G.has_node(clm_a_node) and G.has_node(clm_b_node):
-            # Direct contradiction edge between claims
+            conflict_claim_ids.add(clm_a_node)
+            conflict_claim_ids.add(clm_b_node)
             G.add_edge(
                 clm_a_node,
                 clm_b_node,
@@ -103,36 +129,26 @@ def build_investigation_knowledge_graph(
                 explanation=cnf.get("explanation", "")
             )
 
-        # Also connect documents with CONFLICT relationship
-        doc_a_node = f"doc_{cnf['evidence_a_id']}"
-        doc_b_node = f"doc_{cnf['evidence_b_id']}"
-        if G.has_node(doc_a_node) and G.has_node(doc_b_node):
-            G.add_edge(
-                doc_a_node,
-                doc_b_node,
-                edge_type="CONFLICTS_WITH",
-                label="CONFLICTS_WITH",
-                severity=cnf.get("severity", "HIGH")
-            )
-
-    # 5. Arrange Layout Coordinates for React Flow
+    # 5. Position nodes in a clean, spacious 3-column layout
     react_nodes = []
     react_edges = []
 
-    # Simple column/layer based positioning:
-    # Col 1: Documents (x=100)
-    # Col 2: Claims (x=500)
-    # Col 3: Entities (x=950)
     doc_nodes = [n for n, d in G.nodes(data=True) if d.get("node_type") == "DOCUMENT"]
     clm_nodes = [n for n, d in G.nodes(data=True) if d.get("node_type") == "CLAIM"]
     ent_nodes = [n for n, d in G.nodes(data=True) if d.get("node_type") == "ENTITY"]
 
+    # Calculate vertical spacing to balance the height of each column
+    max_count = max(len(doc_nodes), len(clm_nodes), (len(ent_nodes) + 1) // 2, 1)
+    base_height = max(500, max_count * 120)
+
+    # Column 1: Documents (x: 50)
+    doc_spacing = base_height / (len(doc_nodes) + 1) if doc_nodes else 150
     for idx, n in enumerate(doc_nodes):
         d = G.nodes[n]
         react_nodes.append({
             "id": n,
             "type": "customNode",
-            "position": {"x": 50, "y": 80 + idx * 160},
+            "position": {"x": 50, "y": int(80 + (idx + 0.5) * doc_spacing)},
             "data": {
                 "id": n,
                 "nodeType": "DOCUMENT",
@@ -143,17 +159,15 @@ def build_investigation_knowledge_graph(
             }
         })
 
+    # Column 2: Claims (x: 440)
+    clm_spacing = base_height / (len(clm_nodes) + 1) if clm_nodes else 120
     for idx, n in enumerate(clm_nodes):
         d = G.nodes[n]
-        # Check if this claim has contradiction
-        has_conflict = any(
-            (u == n or v == n) and edata.get("edge_type") == "CONTRADICTS"
-            for u, v, edata in G.edges(data=True)
-        )
+        has_conflict = n in conflict_claim_ids
         react_nodes.append({
             "id": n,
             "type": "customNode",
-            "position": {"x": 450, "y": 60 + idx * 110},
+            "position": {"x": 440, "y": int(60 + (idx + 0.5) * clm_spacing)},
             "data": {
                 "id": n,
                 "nodeType": "CLAIM",
@@ -165,12 +179,18 @@ def build_investigation_knowledge_graph(
             }
         })
 
+    # Column 3 & 4: Entities arranged in a compact 2-column grid (x: 820, 1080)
     for idx, n in enumerate(ent_nodes):
         d = G.nodes[n]
+        col = idx % 2
+        row = idx // 2
+        x_pos = 820 + col * 260
+        y_pos = 80 + row * 95
+
         react_nodes.append({
             "id": n,
             "type": "customNode",
-            "position": {"x": 880, "y": 80 + idx * 120},
+            "position": {"x": x_pos, "y": y_pos},
             "data": {
                 "id": n,
                 "nodeType": "ENTITY",
@@ -181,22 +201,22 @@ def build_investigation_knowledge_graph(
             }
         })
 
-    # Edges
+    # 6. Edges (Clean lines, zero clutter on standard edges, only CONTRADICTS has a badge)
     edge_idx = 0
     for u, v, edata in G.edges(data=True):
         edge_type = edata.get("edge_type", "RELATED_TO")
-        is_conflict = edge_type in ["CONTRADICTS", "CONFLICTS_WITH"]
-        
-        react_edges.append({
+        is_conflict = edge_type == "CONTRADICTS"
+
+        edge_obj = {
             "id": f"e_{u}_{v}_{edge_idx}",
             "source": u,
             "target": v,
-            "label": edata.get("label", edge_type),
             "type": "smoothstep",
             "animated": is_conflict,
             "style": {
-                "stroke": "#dc2626" if is_conflict else "#2563eb" if edge_type == "MENTIONS" else "#64748b",
-                "strokeWidth": 2.5 if is_conflict else 1.5,
+                "stroke": "#f43f5e" if is_conflict else "#3b82f6" if edge_type == "MENTIONS" else "#475569",
+                "strokeWidth": 2.5 if is_conflict else 1.2,
+                "opacity": 1.0 if is_conflict else 0.45,
                 "strokeDasharray": "5,5" if is_conflict else "none"
             },
             "data": {
@@ -204,7 +224,15 @@ def build_investigation_knowledge_graph(
                 "severity": edata.get("severity"),
                 "explanation": edata.get("explanation")
             }
-        })
+        }
+
+        # ONLY label the contradiction edge! Do NOT put 'MENTIONS' text labels everywhere!
+        if is_conflict:
+            edge_obj["label"] = "CONTRADICTION"
+            edge_obj["labelStyle"] = {"fill": "#fda4af", "fontWeight": 700, "fontSize": "10px"}
+            edge_obj["labelBgStyle"] = {"fill": "#881337", "fillOpacity": 0.9, "rx": 4, "ry": 4}
+
+        react_edges.append(edge_obj)
         edge_idx += 1
 
     return {
@@ -216,6 +244,6 @@ def build_investigation_knowledge_graph(
             "claims_count": len(clm_nodes),
             "entities_count": len(ent_nodes),
             "total_edges": len(react_edges),
-            "conflict_edges": len([e for e in react_edges if "strokeDasharray" in e.get("style", {}) and e["style"]["strokeDasharray"] != "none"])
+            "conflict_edges": len([e for e in react_edges if e.get("animated")])
         }
     }
