@@ -285,11 +285,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
       {/* Center Section: Logo, Title, Tagline & 8 Cards */}
       <div className="flex-1 flex flex-col items-center justify-center my-6 space-y-6">
-        {/* Brand Shield & Titles */}
+        {/* Brand Logo & Titles */}
         <div className="flex flex-col items-center text-center space-y-2">
-          {/* Outlined Shield with Checkmark */}
-          <div className="w-16 h-16 flex items-center justify-center text-white mb-1">
-            <ShieldCheck className="w-16 h-16 stroke-[1.25] text-white" />
+          {/* Custom Futuristic Cyber-Head Logo */}
+          <div className="w-20 h-20 flex items-center justify-center mb-1">
+            <img
+              src="/logo.png"
+              alt="CERBERUS-X Logo"
+              className="w-20 h-20 object-contain rounded-2xl drop-shadow-[0_0_25px_rgba(255,255,255,0.18)]"
+            />
           </div>
 
           <h1 className="text-3xl font-extrabold tracking-tight text-white font-sans">

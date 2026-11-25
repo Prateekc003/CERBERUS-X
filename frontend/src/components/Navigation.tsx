@@ -65,11 +65,13 @@ export const Navigation: React.FC<NavigationProps> = ({
         <div className="pt-5 px-4 pb-4 flex items-center justify-between border-b border-[#1f1f28]/60">
           <div
             onClick={() => onTabChange('home')}
-            className="flex items-center space-x-2.5 cursor-pointer"
+            className="flex items-center space-x-2.5 cursor-pointer group"
           >
-            <div className="w-6 h-6 flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
+            <img
+              src="/logo.png"
+              alt="CERBERUS-X"
+              className="w-7 h-7 object-contain rounded-lg border border-white/10 group-hover:border-white/30 transition-all shadow-xs"
+            />
             <span className="font-bold text-sm tracking-wider text-white font-sans">
               CERBERUS-X
             </span>
