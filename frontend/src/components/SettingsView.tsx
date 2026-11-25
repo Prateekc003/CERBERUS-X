@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Settings,
   Mail,
+  ShieldCheck,
   CreditCard,
-  Sparkles,
   Compass,
-  BookOpen,
-  Bell,
+  Cpu,
+  Brain,
+  CheckCheck,
+  FileSearch,
   Grid,
-  Megaphone,
   Shield,
   Archive,
   Lock,
   Globe,
-  AppWindow,
   Palette,
-  Type,
-  Link2,
+  LayoutTemplate,
+  Sun,
+  Moon,
   ArrowUpCircle,
   ChevronRight,
   X,
@@ -24,12 +26,8 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
-  Cpu,
-  Database,
   Save,
   LogOut,
-  Sun,
-  Moon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NavTab } from './Navigation';
@@ -45,14 +43,10 @@ interface SettingsViewProps {
 
 type ActiveModal =
   | null
-  | 'upgrade'
   | 'personalization'
-  | 'memory'
-  | 'notifications'
+  | 'models'
   | 'plugins'
-  | 'ads'
   | 'data'
-  | 'archived'
   | 'security'
   | 'updates';
 
@@ -70,30 +64,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     updateUserProfileInfo,
     resendVerificationEmail,
     sendPasswordReset,
-    refreshAuthUser,
     logout,
   } = useAuth();
 
   // Settings State with localStorage persistence
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-  const [appLanguage, setAppLanguage] = useState<string>(() => {
-    return localStorage.getItem('cerberus_setting_language') || 'English';
+
+  // Investigation & AI Engine Settings
+  const [ollamaModel, setOllamaModel] = useState<string>(() => {
+    return localStorage.getItem('cerberus_setting_ollama_model') || 'qwen3.5:4b';
   });
-  const [showInMenuBar, setShowInMenuBar] = useState<string>(() => {
-    return localStorage.getItem('cerberus_setting_menubar') || 'When app is running';
-  });
-  const [accentColor, setAccentColor] = useState<string>(() => {
-    return localStorage.getItem('cerberus_setting_accent') || 'Blue';
-  });
-  const [autoCorrect, setAutoCorrect] = useState<boolean>(() => {
-    return localStorage.getItem('cerberus_setting_autocorrect') === 'true';
-  });
-  const [openInDesktop, setOpenInDesktop] = useState<boolean>(() => {
-    const saved = localStorage.getItem('cerberus_setting_openlinks');
+
+  const [autoDetectConflicts, setAutoDetectConflicts] = useState<boolean>(() => {
+    const saved = localStorage.getItem('cerberus_setting_autocontradict');
     return saved !== null ? saved === 'true' : true;
   });
 
-  // Personalization form state
+  const [strictCitation, setStrictCitation] = useState<boolean>(() => {
+    const saved = localStorage.getItem('cerberus_setting_strictcitation');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  // App & Interface Preferences
+  const [appLanguage, setAppLanguage] = useState<string>(() => {
+    return localStorage.getItem('cerberus_setting_language') || 'English';
+  });
+
+  const [accentColor, setAccentColor] = useState<string>(() => {
+    return localStorage.getItem('cerberus_setting_accent') || 'Blue';
+  });
+
+  const [sidebarDefault, setSidebarDefault] = useState<string>(() => {
+    return localStorage.getItem('cerberus_setting_sidebar_default') || 'Expanded';
+  });
+
+  // Personalization State
   const initialName =
     userProfile?.fullName ||
     user?.displayName ||
@@ -116,30 +121,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     text: string;
   } | null>(null);
 
-  // Security actions state
+  // Security action states
   const [resendingEmail, setResendingEmail] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
 
   // Sync settings to localStorage
   useEffect(() => {
-    localStorage.setItem('cerberus_setting_language', appLanguage);
-  }, [appLanguage]);
+    localStorage.setItem('cerberus_setting_ollama_model', ollamaModel);
+  }, [ollamaModel]);
 
   useEffect(() => {
-    localStorage.setItem('cerberus_setting_menubar', showInMenuBar);
-  }, [showInMenuBar]);
+    localStorage.setItem('cerberus_setting_autocontradict', String(autoDetectConflicts));
+  }, [autoDetectConflicts]);
+
+  useEffect(() => {
+    localStorage.setItem('cerberus_setting_strictcitation', String(strictCitation));
+  }, [strictCitation]);
+
+  useEffect(() => {
+    localStorage.setItem('cerberus_setting_language', appLanguage);
+  }, [appLanguage]);
 
   useEffect(() => {
     localStorage.setItem('cerberus_setting_accent', accentColor);
   }, [accentColor]);
 
   useEffect(() => {
-    localStorage.setItem('cerberus_setting_autocorrect', String(autoCorrect));
-  }, [autoCorrect]);
-
-  useEffect(() => {
-    localStorage.setItem('cerberus_setting_openlinks', String(openInDesktop));
-  }, [openInDesktop]);
+    localStorage.setItem('cerberus_setting_sidebar_default', sidebarDefault);
+  }, [sidebarDefault]);
 
   const handleSavePersonalization = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,7 +159,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       localStorage.setItem('cerberus_custom_instructions', customInstructions);
       setFeedback({
         type: 'success',
-        text: 'Personalization and investigator preferences saved.',
+        text: 'Investigator preferences and directives updated.',
       });
       setTimeout(() => {
         setFeedback(null);
@@ -159,7 +168,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     } catch (err: any) {
       setFeedback({
         type: 'error',
-        text: err?.message || 'Failed to save personalization.',
+        text: err?.message || 'Failed to update preferences.',
       });
     } finally {
       setSavingProfile(false);
@@ -209,30 +218,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <div className="min-h-full py-8 px-4 flex justify-center">
-      {/* macOS Desktop Window Frame */}
+      {/* Settings Container (Clean ChatGPT-Style Frame without red/yellow/green icons) */}
       <div className="w-full max-w-[620px] bg-[#141416] border border-[#2b2b32] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.6)] overflow-hidden text-[#ededed]">
-        {/* macOS Title Bar Header */}
-        <div className="px-4 py-3 bg-[#19191d] border-b border-[#26262e] flex items-center select-none">
-          {/* Traffic Lights */}
-          <div className="flex items-center space-x-2 mr-3">
-            <div className="w-3 h-3 rounded-full bg-[#ff5f57] border border-[#e0443e]/40 shadow-xs" />
-            <div className="w-3 h-3 rounded-full bg-[#febc2e] border border-[#d89e24]/40 shadow-xs" />
-            <div className="w-3 h-3 rounded-full bg-[#28c840] border border-[#1aab29]/40 shadow-xs" />
+        {/* Clean Header Bar (No red/yellow/green icons) */}
+        <div className="px-5 py-3.5 bg-[#19191d] border-b border-[#26262e] flex items-center justify-between select-none">
+          <div className="flex items-center space-x-2.5">
+            <Settings className="w-4 h-4 text-slate-400" />
+            <h1 className="text-[13.5px] font-semibold text-white tracking-tight">
+              Settings
+            </h1>
           </div>
-          {/* Window Title */}
-          <div className="text-[13.5px] font-semibold text-white tracking-tight">
-            Settings
-          </div>
+          <span className="text-[11px] font-mono text-[#8e8ea0] bg-[#22222a] px-2.5 py-0.5 rounded-full border border-[#2e2e38]">
+            CERBERUS-X Workspace
+          </span>
         </div>
 
         {/* Settings Body */}
         <div className="p-5 space-y-6">
           {/* ======================================================== */}
-          {/* 1. Account Section */}
+          {/* 1. Account & Investigator Profile                        */}
           {/* ======================================================== */}
           <div>
             <div className="text-[12px] font-medium text-[#8e8ea0] tracking-tight mb-2 px-1">
-              Account
+              Account & Credentials
             </div>
             <div className="bg-[#1b1b20] border border-[#282830] rounded-xl overflow-hidden divide-y divide-[#24242c]">
               {/* 1. Email */}
@@ -246,132 +254,72 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               </div>
 
-              {/* 2. Subscription */}
+              {/* 2. Clearance & Role */}
               <div
-                onClick={() => setActiveModal('upgrade')}
+                onClick={() => setActiveModal('personalization')}
                 className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
               >
                 <div className="flex items-center space-x-3">
-                  <CreditCard className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
-                  <span className="font-medium text-[#ededed]">Subscription</span>
+                  <ShieldCheck className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
+                  <span className="font-medium text-[#ededed]">Clearance Level</span>
                 </div>
-                <button
-                  type="button"
-                  className="text-xs text-[#8e8ea0] group-hover:text-white flex items-center space-x-1 transition-colors"
-                >
-                  <span>Go</span>
-                </button>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-emerald-400 font-mono">
+                    {profileRole}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
+                </div>
               </div>
 
-              {/* 3. Upgrade Plan */}
-              <div
-                onClick={() => setActiveModal('upgrade')}
-                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
-              >
+              {/* 3. License Tier */}
+              <div className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px]">
                 <div className="flex items-center space-x-3">
-                  <Sparkles className="w-4 h-4 text-[#38bdf8] shrink-0" />
-                  <span className="font-medium text-[#38bdf8]">Upgrade plan</span>
+                  <CreditCard className="w-4 h-4 text-[#8e8ea0] shrink-0" />
+                  <span className="font-medium text-[#ededed]">Station License</span>
                 </div>
+                <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[#252530] text-sky-400 border border-sky-900/40">
+                  Enterprise Station
+                </span>
               </div>
 
-              {/* 4. Personalization */}
+              {/* 4. Investigation Directives / Personalization */}
               <div
                 onClick={() => setActiveModal('personalization')}
                 className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
               >
                 <div className="flex items-center space-x-3">
                   <Compass className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
-                  <span className="font-medium text-[#ededed]">Personalization</span>
+                  <span className="font-medium text-[#ededed]">
+                    Investigation Directives & Persona
+                  </span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
               </div>
 
-              {/* 5. Memory */}
-              <div
-                onClick={() => setActiveModal('memory')}
-                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
-              >
-                <div className="flex items-center space-x-3">
-                  <BookOpen className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
-                  <span className="font-medium text-[#ededed]">Memory</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
-              </div>
-
-              {/* 6. Notifications */}
-              <div
-                onClick={() => setActiveModal('notifications')}
-                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
-              >
-                <div className="flex items-center space-x-3">
-                  <Bell className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
-                  <span className="font-medium text-[#ededed]">Notifications</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
-              </div>
-
-              {/* 7. Plugins */}
-              <div
-                onClick={() => setActiveModal('plugins')}
-                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
-              >
-                <div className="flex items-center space-x-3">
-                  <Grid className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
-                  <span className="font-medium text-[#ededed]">Plugins</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
-              </div>
-
-              {/* 8. Ads controls */}
-              <div
-                onClick={() => setActiveModal('ads')}
-                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
-              >
-                <div className="flex items-center space-x-3">
-                  <Megaphone className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
-                  <span className="font-medium text-[#ededed]">Ads controls</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
-              </div>
-
-              {/* 9. Data controls */}
-              <div
-                onClick={() => setActiveModal('data')}
-                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
-              >
-                <div className="flex items-center space-x-3">
-                  <Shield className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
-                  <span className="font-medium text-[#ededed]">Data controls</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
-              </div>
-
-              {/* 10. Archived chats */}
-              <div
-                onClick={() => {
-                  if (onNavigate) {
-                    onNavigate('investigations');
-                  } else {
-                    setActiveModal('archived');
-                  }
-                }}
-                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
-              >
-                <div className="flex items-center space-x-3">
-                  <Archive className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
-                  <span className="font-medium text-[#ededed]">Archived chats</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
-              </div>
-
-              {/* 11. Security and login */}
+              {/* 5. Security & Login */}
               <div
                 onClick={() => setActiveModal('security')}
                 className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
               >
                 <div className="flex items-center space-x-3">
                   <Lock className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
-                  <span className="font-medium text-[#ededed]">Security and login</span>
+                  <span className="font-medium text-[#ededed]">Security and Login</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
+              </div>
+
+              {/* 6. Archived Investigations */}
+              <div
+                onClick={() => {
+                  if (onNavigate) {
+                    onNavigate('investigations');
+                  }
+                }}
+                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
+              >
+                <div className="flex items-center space-x-3">
+                  <Archive className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
+                  <span className="font-medium text-[#ededed]">Archived Investigations</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
               </div>
@@ -379,66 +327,166 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
 
           {/* ======================================================== */}
-          {/* 2. App Section */}
+          {/* 2. Investigation & AI Reasoning Engine                   */}
           {/* ======================================================== */}
           <div>
             <div className="text-[12px] font-medium text-[#8e8ea0] tracking-tight mb-2 px-1">
-              App
+              Evidentiary AI Engine
             </div>
             <div className="bg-[#1b1b20] border border-[#282830] rounded-xl overflow-hidden divide-y divide-[#24242c]">
-              {/* 1. App language */}
+              {/* 1. Local AI Model */}
               <div className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px]">
                 <div className="flex items-center space-x-3">
-                  <Globe className="w-4 h-4 text-[#8e8ea0] shrink-0" />
-                  <span className="font-medium text-[#ededed]">App language</span>
+                  <Cpu className="w-4 h-4 text-blue-400 shrink-0" />
+                  <span className="font-medium text-[#ededed]">Local AI Model (Ollama)</span>
                 </div>
-                <div className="flex items-center space-x-1 text-xs text-[#8e8ea0]">
+                <div className="flex items-center space-x-1.5 text-xs text-[#8e8ea0]">
                   <select
-                    value={appLanguage}
-                    onChange={(e) => setAppLanguage(e.target.value)}
-                    className="bg-transparent text-[#8e8ea0] hover:text-white text-xs cursor-pointer focus:outline-none pr-1"
-                  >
-                    <option value="English" className="bg-[#1e1e24] text-white">English</option>
-                    <option value="Spanish" className="bg-[#1e1e24] text-white">Español</option>
-                    <option value="French" className="bg-[#1e1e24] text-white">Français</option>
-                    <option value="German" className="bg-[#1e1e24] text-white">Deutsch</option>
-                    <option value="Japanese" className="bg-[#1e1e24] text-white">日本語</option>
-                  </select>
-                  <ChevronRight className="w-3.5 h-3.5 text-[#71717a]" />
-                </div>
-              </div>
-
-              {/* 2. Show in Menu Bar */}
-              <div className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px]">
-                <div className="flex items-center space-x-3">
-                  <AppWindow className="w-4 h-4 text-[#8e8ea0] shrink-0" />
-                  <span className="font-medium text-[#ededed]">Show in Menu Bar</span>
-                </div>
-                <div className="flex items-center text-xs text-[#8e8ea0]">
-                  <select
-                    value={showInMenuBar}
-                    onChange={(e) => setShowInMenuBar(e.target.value)}
+                    value={ollamaModel}
+                    onChange={(e) => setOllamaModel(e.target.value)}
                     className="bg-transparent text-[#8e8ea0] hover:text-white text-xs cursor-pointer focus:outline-none"
                   >
-                    <option value="When app is running" className="bg-[#1e1e24] text-white">
-                      When app is running
+                    <option value="qwen3.5:4b" className="bg-[#1e1e24] text-white">
+                      qwen3.5:4b (Offline)
                     </option>
-                    <option value="Always" className="bg-[#1e1e24] text-white">
-                      Always
+                    <option value="qwen3.5:latest" className="bg-[#1e1e24] text-white">
+                      qwen3.5:latest
                     </option>
-                    <option value="Never" className="bg-[#1e1e24] text-white">
-                      Never
+                    <option value="qwen2.5:7b" className="bg-[#1e1e24] text-white">
+                      qwen2.5:7b
                     </option>
                   </select>
-                  <span className="ml-1 text-[11px] text-[#71717a]">⬍</span>
+                  <span className="text-[11px] text-[#71717a]">⬍</span>
                 </div>
               </div>
 
-              {/* 3. Accent color */}
+              {/* 2. Reasoning Mode */}
+              <div
+                onClick={() => setActiveModal('models')}
+                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
+              >
+                <div className="flex items-center space-x-3">
+                  <Brain className="w-4 h-4 text-purple-400 shrink-0" />
+                  <span className="font-medium text-[#ededed]">Active Reasoning Engine</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[11px] font-mono text-emerald-400">
+                    {systemStatus?.reasoning_mode || 'Rule-Based & Ollama Fallback'}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
+                </div>
+              </div>
+
+              {/* 3. Auto-Detect Contradictions */}
+              <div className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px]">
+                <div className="flex items-center space-x-3">
+                  <CheckCheck className="w-4 h-4 text-[#8e8ea0] shrink-0" />
+                  <span className="font-medium text-[#ededed]">
+                    Auto-Detect Evidence Contradictions
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAutoDetectConflicts((prev) => !prev)}
+                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${
+                    autoDetectConflicts ? 'bg-blue-600' : 'bg-[#3e3e48]'
+                  }`}
+                  aria-label="Toggle auto-detect contradictions"
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                      autoDetectConflicts ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* 4. Strict Citation Enforcement */}
+              <div className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px]">
+                <div className="flex items-center space-x-3">
+                  <FileSearch className="w-4 h-4 text-[#8e8ea0] shrink-0" />
+                  <span className="font-medium text-[#ededed]">
+                    Zero-Hallucination Citation Verification
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStrictCitation((prev) => !prev)}
+                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${
+                    strictCitation ? 'bg-blue-600' : 'bg-[#3e3e48]'
+                  }`}
+                  aria-label="Toggle strict citation enforcement"
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                      strictCitation ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* 5. Analysis Plugins & Microservices */}
+              <div
+                onClick={() => setActiveModal('plugins')}
+                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
+              >
+                <div className="flex items-center space-x-3">
+                  <Grid className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
+                  <span className="font-medium text-[#ededed]">Analysis Plugins & NER Engines</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[11px] font-mono text-[#8e8ea0]">
+                    spaCy v3.8 Active
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
+                </div>
+              </div>
+
+              {/* 6. Evidentiary Data Controls */}
+              <div
+                onClick={() => setActiveModal('data')}
+                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
+              >
+                <div className="flex items-center space-x-3">
+                  <Shield className="w-4 h-4 text-[#8e8ea0] group-hover:text-white shrink-0 transition-colors" />
+                  <span className="font-medium text-[#ededed]">Data Controls & Demo Scenario</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
+              </div>
+            </div>
+          </div>
+
+          {/* ======================================================== */}
+          {/* 3. App & Workspace Preferences                           */}
+          {/* ======================================================== */}
+          <div>
+            <div className="text-[12px] font-medium text-[#8e8ea0] tracking-tight mb-2 px-1">
+              Workspace & Appearance
+            </div>
+            <div className="bg-[#1b1b20] border border-[#282830] rounded-xl overflow-hidden divide-y divide-[#24242c]">
+              {/* 1. Interface Theme */}
+              <div
+                onClick={onToggleTheme}
+                className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
+              >
+                <div className="flex items-center space-x-3">
+                  {theme === 'dark' ? (
+                    <Moon className="w-4 h-4 text-blue-400 shrink-0" />
+                  ) : (
+                    <Sun className="w-4 h-4 text-amber-400 shrink-0" />
+                  )}
+                  <span className="font-medium text-[#ededed]">Theme Mode</span>
+                </div>
+                <span className="text-xs text-[#8e8ea0] group-hover:text-white transition-colors">
+                  {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                </span>
+              </div>
+
+              {/* 2. Accent Color */}
               <div className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px]">
                 <div className="flex items-center space-x-3">
                   <Palette className="w-4 h-4 text-[#8e8ea0] shrink-0" />
-                  <span className="font-medium text-[#ededed]">Accent color</span>
+                  <span className="font-medium text-[#ededed]">Accent Color</span>
                 </div>
                 <div className="flex items-center space-x-1.5 text-xs text-[#8e8ea0]">
                   <span
@@ -469,55 +517,48 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               </div>
 
-              {/* 4. Auto-correct spelling */}
+              {/* 3. App Language */}
               <div className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px]">
                 <div className="flex items-center space-x-3">
-                  <Type className="w-4 h-4 text-[#8e8ea0] shrink-0" />
-                  <span className="font-medium text-[#ededed]">Auto-correct spelling</span>
+                  <Globe className="w-4 h-4 text-[#8e8ea0] shrink-0" />
+                  <span className="font-medium text-[#ededed]">App Language</span>
                 </div>
-                {/* macOS Toggle Switch (Off state in screenshot) */}
-                <button
-                  type="button"
-                  onClick={() => setAutoCorrect((prev) => !prev)}
-                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${
-                    autoCorrect ? 'bg-blue-600' : 'bg-[#3e3e48]'
-                  }`}
-                  aria-label="Toggle auto-correct spelling"
-                >
-                  <div
-                    className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                      autoCorrect ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                <div className="flex items-center space-x-1 text-xs text-[#8e8ea0]">
+                  <select
+                    value={appLanguage}
+                    onChange={(e) => setAppLanguage(e.target.value)}
+                    className="bg-transparent text-[#8e8ea0] hover:text-white text-xs cursor-pointer focus:outline-none pr-1"
+                  >
+                    <option value="English" className="bg-[#1e1e24] text-white">English</option>
+                    <option value="Spanish" className="bg-[#1e1e24] text-white">Español</option>
+                    <option value="French" className="bg-[#1e1e24] text-white">Français</option>
+                    <option value="German" className="bg-[#1e1e24] text-white">Deutsch</option>
+                    <option value="Japanese" className="bg-[#1e1e24] text-white">日本語</option>
+                  </select>
+                  <ChevronRight className="w-3.5 h-3.5 text-[#71717a]" />
+                </div>
               </div>
 
-              {/* 5. Open links in desktop app */}
+              {/* 4. Default Sidebar Layout */}
               <div className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px]">
                 <div className="flex items-center space-x-3">
-                  <Link2 className="w-4 h-4 text-[#8e8ea0] shrink-0" />
-                  <span className="font-medium text-[#ededed]">
-                    Open ChatGPT links in desktop app
-                  </span>
+                  <LayoutTemplate className="w-4 h-4 text-[#8e8ea0] shrink-0" />
+                  <span className="font-medium text-[#ededed]">Default Sidebar Layout</span>
                 </div>
-                {/* macOS Toggle Switch (On state in screenshot) */}
-                <button
-                  type="button"
-                  onClick={() => setOpenInDesktop((prev) => !prev)}
-                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${
-                    openInDesktop ? 'bg-blue-600' : 'bg-[#3e3e48]'
-                  }`}
-                  aria-label="Toggle open links in desktop app"
-                >
-                  <div
-                    className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                      openInDesktop ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                <div className="flex items-center text-xs text-[#8e8ea0]">
+                  <select
+                    value={sidebarDefault}
+                    onChange={(e) => setSidebarDefault(e.target.value)}
+                    className="bg-transparent text-[#8e8ea0] hover:text-white text-xs cursor-pointer focus:outline-none"
+                  >
+                    <option value="Expanded" className="bg-[#1e1e24] text-white">Expanded</option>
+                    <option value="Collapsed" className="bg-[#1e1e24] text-white">Collapsed</option>
+                  </select>
+                  <span className="ml-1 text-[11px] text-[#71717a]">⬍</span>
+                </div>
               </div>
 
-              {/* 6. Check for updates */}
+              {/* 5. Check for updates */}
               <div
                 onClick={() => setActiveModal('updates')}
                 className="flex items-center justify-between px-3.5 py-2.5 text-[13.5px] hover:bg-[#23232b] cursor-pointer transition-colors group"
@@ -527,8 +568,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <span className="font-medium text-[#ededed]">Check for updates...</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#272730] text-[#a0a0ab] border border-[#343440]">
-                    ChatGPT
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#272730] text-sky-300 border border-[#343440]">
+                    CERBERUS-X v2.4
                   </span>
                   <ChevronRight className="w-4 h-4 text-[#71717a] group-hover:text-[#a1a1aa] transition-colors" />
                 </div>
@@ -539,72 +580,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* ======================================================== */}
-      {/* Interactive Detail Modals matching ChatGPT desktop UI   */}
+      {/* Interactive Detail Modals                                */}
       {/* ======================================================== */}
 
-      {/* 1. Upgrade Plan Modal */}
-      {activeModal === 'upgrade' && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#18181b] border border-[#2e2e38] rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl text-white">
-            <div className="px-5 py-3.5 bg-[#1f1f24] border-b border-[#2d2d38] flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Sparkles className="w-4 h-4 text-[#38bdf8]" />
-                <h3 className="text-sm font-semibold text-white">Upgrade your plan</h3>
-              </div>
-              <button
-                onClick={() => setActiveModal(null)}
-                className="p-1 rounded-md text-[#8e8ea0] hover:text-white hover:bg-[#2c2c36]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl border border-[#343442] bg-[#1d1d23] space-y-2">
-                  <div className="text-xs font-semibold uppercase text-slate-400">Current Plan</div>
-                  <div className="text-lg font-bold">Investigator Free</div>
-                  <p className="text-xs text-slate-400">
-                    Ollama Qwen 3.5 local inference, rule-based conflict checks, and SQLite case storage.
-                  </p>
-                  <div className="pt-2">
-                    <span className="px-2 py-1 rounded-md text-[11px] font-mono bg-[#282834] text-emerald-400 border border-emerald-900/40">
-                      Active Session
-                    </span>
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl border border-sky-500/50 bg-[#16202c] space-y-2 relative overflow-hidden">
-                  <div className="text-xs font-semibold uppercase text-sky-400">Enterprise AI</div>
-                  <div className="text-lg font-bold">CERBERUS-X Pro</div>
-                  <p className="text-xs text-slate-300">
-                    Multi-agent parallel verification, OCR handwriting ingestion, and team cloud sync.
-                  </p>
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        alert('Your instance already has CERBERUS-X Pro and offline Qwen 3.5 local model unlocked!');
-                        setActiveModal(null);
-                      }}
-                      className="w-full py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-black font-semibold text-xs transition-colors"
-                    >
-                      Included in Workspace
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Personalization Modal */}
+      {/* 1. Personalization Modal */}
       {activeModal === 'personalization' && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#18181b] border border-[#2e2e38] rounded-2xl max-w-md w-full overflow-hidden shadow-2xl text-white">
             <div className="px-5 py-3.5 bg-[#1f1f24] border-b border-[#2d2d38] flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Compass className="w-4 h-4 text-[#8e8ea0]" />
-                <h3 className="text-sm font-semibold text-white">Personalization</h3>
+                <h3 className="text-sm font-semibold text-white">
+                  Investigator Persona & Directives
+                </h3>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
@@ -632,7 +620,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               )}
               <div>
                 <label className="text-[11px] font-mono uppercase text-slate-400 block mb-1.5">
-                  Full Name
+                  Investigator Full Name
                 </label>
                 <input
                   type="text"
@@ -643,7 +631,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
               <div>
                 <label className="text-[11px] font-mono uppercase text-slate-400 block mb-1.5">
-                  Role / Designation
+                  Operational Title / Role
                 </label>
                 <input
                   type="text"
@@ -654,7 +642,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
               <div>
                 <label className="text-[11px] font-mono uppercase text-slate-400 block mb-1.5">
-                  Custom Evidentiary Instructions
+                  Custom Evidentiary Instructions & Directives
                 </label>
                 <textarea
                   rows={3}
@@ -674,7 +662,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   ) : (
                     <Save className="w-3.5 h-3.5" />
                   )}
-                  <span>Save Changes</span>
+                  <span>Save Directives</span>
                 </button>
               </div>
             </form>
@@ -682,14 +670,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* 3. Memory & Evidentiary Engine Modal */}
-      {activeModal === 'memory' && (
+      {/* 2. Models & Memory Modal */}
+      {activeModal === 'models' && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#18181b] border border-[#2e2e38] rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl text-white">
             <div className="px-5 py-3.5 bg-[#1f1f24] border-b border-[#2d2d38] flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <BookOpen className="w-4 h-4 text-[#8e8ea0]" />
-                <h3 className="text-sm font-semibold text-white">Evidentiary Memory & Models</h3>
+                <Brain className="w-4 h-4 text-purple-400" />
+                <h3 className="text-sm font-semibold text-white">Evidentiary AI Models</h3>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
@@ -701,25 +689,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="p-6 space-y-4 text-xs">
               <div className="bg-[#1e1e24] border border-[#343442] rounded-xl p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-white">Ollama Local Engine</span>
+                  <span className="font-semibold text-white">Ollama Local Service</span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-950/60 text-emerald-300 border border-emerald-900/60">
                     Connected (127.0.0.1:11434)
                   </span>
                 </div>
                 <div className="text-slate-400 text-[11px]">
-                  Model: <span className="text-white font-mono">qwen3.5:4b / qwen3.5:latest</span>
+                  Configured Model: <span className="text-white font-mono">{ollamaModel}</span>
                 </div>
                 <p className="text-slate-400 text-[11px]">
-                  Offline inference activated. Case questions are answered directly on device without sending sensitive documents to external servers.
+                  Local model processes case inquiries offline on device without transferring case materials over the internet.
                 </p>
               </div>
               <div className="bg-[#1e1e24] border border-[#343442] rounded-xl p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-white">Zero Hallucination Grounding</span>
-                  <span className="text-slate-400 text-[11px] font-mono">SHA-256 Anchored</span>
+                  <span className="font-semibold text-white">Deterministic Citation Grounding</span>
+                  <span className="text-slate-400 text-[11px] font-mono">SHA-256 Verified</span>
                 </div>
                 <p className="text-slate-400 text-[11px]">
-                  Every generated answer must match explicit citation spans from uploaded evidence. Claims without physical documents are rejected.
+                  Zero fabrication policy. Uncited statements are immediately rejected and highlighted in red.
                 </p>
               </div>
             </div>
@@ -727,61 +715,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* 4. Notifications Modal */}
-      {activeModal === 'notifications' && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#18181b] border border-[#2e2e38] rounded-2xl max-w-md w-full overflow-hidden shadow-2xl text-white">
-            <div className="px-5 py-3.5 bg-[#1f1f24] border-b border-[#2d2d38] flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Bell className="w-4 h-4 text-[#8e8ea0]" />
-                <h3 className="text-sm font-semibold text-white">Notifications</h3>
-              </div>
-              <button
-                onClick={() => setActiveModal(null)}
-                className="p-1 rounded-md text-[#8e8ea0] hover:text-white hover:bg-[#2c2c36]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4 text-xs">
-              <div className="flex items-center justify-between py-2 border-b border-[#2e2e38]">
-                <div>
-                  <div className="font-semibold text-white">Discrepancy Alerts</div>
-                  <div className="text-[11px] text-slate-400">Notify when contradictory quantities are detected</div>
-                </div>
-                <span className="text-emerald-400 font-mono text-[11px]">Enabled</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-[#2e2e38]">
-                <div>
-                  <div className="font-semibold text-white">Case Report Export Ready</div>
-                  <div className="text-[11px] text-slate-400">Trigger alert upon PDF dossier generation</div>
-                </div>
-                <span className="text-emerald-400 font-mono text-[11px]">Enabled</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <div className="font-semibold text-white">Email Verification Notice</div>
-                  <div className="text-[11px] text-slate-400">
-                    {user?.emailVerified ? 'Account verified' : 'Action recommended'}
-                  </div>
-                </div>
-                <span className={user?.emailVerified ? 'text-emerald-400 font-mono text-[11px]' : 'text-amber-400 font-mono text-[11px]'}>
-                  {user?.emailVerified ? 'Verified' : 'Pending'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 5. Plugins Modal */}
+      {/* 3. Plugins & NER Modal */}
       {activeModal === 'plugins' && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#18181b] border border-[#2e2e38] rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl text-white">
             <div className="px-5 py-3.5 bg-[#1f1f24] border-b border-[#2d2d38] flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Grid className="w-4 h-4 text-[#8e8ea0]" />
-                <h3 className="text-sm font-semibold text-white">Active Plugins & Microservices</h3>
+                <h3 className="text-sm font-semibold text-white">Active Case Plugins</h3>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
@@ -812,7 +753,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="bg-[#1e1e24] border border-[#343442] p-3.5 rounded-xl flex items-center justify-between">
                 <div>
                   <div className="font-semibold text-white">SQLite Evidentiary Store</div>
-                  <div className="text-[11px] text-slate-400">Relational case repository & conflict index</div>
+                  <div className="text-[11px] text-slate-400">Case files, claims, and contradiction ledger</div>
                 </div>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-950/60 text-emerald-300 border border-emerald-900/50">
                   Active
@@ -823,41 +764,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* 6. Ads / Evidentiary Controls Modal */}
-      {activeModal === 'ads' && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#18181b] border border-[#2e2e38] rounded-2xl max-w-md w-full overflow-hidden shadow-2xl text-white">
-            <div className="px-5 py-3.5 bg-[#1f1f24] border-b border-[#2d2d38] flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Megaphone className="w-4 h-4 text-[#8e8ea0]" />
-                <h3 className="text-sm font-semibold text-white">Ads & Privacy Controls</h3>
-              </div>
-              <button
-                onClick={() => setActiveModal(null)}
-                className="p-1 rounded-md text-[#8e8ea0] hover:text-white hover:bg-[#2c2c36]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4 text-xs text-slate-300">
-              <div className="p-3 bg-[#1e1e24] border border-[#343442] rounded-xl space-y-1">
-                <div className="font-semibold text-white">Zero Tracking Guarantee</div>
-                <p className="text-[11px] text-slate-400">
-                  CERBERUS-X does not serve commercial advertisements or share case investigation telemetry with third-party ad networks.
-                </p>
-              </div>
-              <div className="p-3 bg-[#1e1e24] border border-[#343442] rounded-xl space-y-1">
-                <div className="font-semibold text-white">Local Device Isolation</div>
-                <p className="text-[11px] text-slate-400">
-                  Evidence files are analyzed inside your designated sandbox and SQLite database.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 7. Data Controls Modal */}
+      {/* 4. Evidentiary Data Controls Modal */}
       {activeModal === 'data' && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#18181b] border border-[#2e2e38] rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl text-white">
@@ -897,9 +804,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
               <div className="bg-[#1e1e24] border border-[#343442] rounded-xl p-4 flex items-center justify-between">
                 <div>
-                  <h4 className="font-bold text-white text-xs">Clear Local Storage Cache</h4>
+                  <h4 className="font-bold text-white text-xs">Clear Local UI Cache</h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Reset saved sidebar widths, custom layout preferences, and cached filters.
+                    Reset saved sidebar widths, drag preferences, and cached filters.
                   </p>
                 </div>
                 <button
@@ -907,7 +814,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   onClick={() => {
                     localStorage.removeItem('cerberus_sidebar_width');
                     localStorage.removeItem('cerberus_sidebar_mode');
-                    alert('Local UI cache reset. Refreshing page...');
+                    alert('Local UI cache reset. Reloading interface...');
                     window.location.reload();
                   }}
                   className="px-3 py-1.5 rounded-lg bg-red-950/60 border border-red-900/60 text-red-200 hover:bg-red-900/80 text-xs font-semibold shrink-0 ml-3 transition-colors"
@@ -920,7 +827,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* 8. Security and Login Modal */}
+      {/* 5. Security & Login Modal */}
       {activeModal === 'security' && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#18181b] border border-[#2e2e38] rounded-2xl max-w-md w-full overflow-hidden shadow-2xl text-white">
@@ -1002,7 +909,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* 9. Updates Modal */}
+      {/* 6. Software Updates Modal */}
       {activeModal === 'updates' && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#18181b] border border-[#2e2e38] rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl text-white">
@@ -1022,10 +929,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="w-12 h-12 mx-auto rounded-full bg-emerald-950/60 border border-emerald-900/60 text-emerald-400 flex items-center justify-center">
                 <Check className="w-6 h-6" />
               </div>
-              <div className="font-bold text-white text-sm">You are on the latest version</div>
+              <div className="font-bold text-white text-sm">Station Software is Up to Date</div>
               <p className="text-slate-400 text-[11.5px]">
-                CERBERUS-X Desktop v2.4.0 (Build 2026.11-macOS)<br />
-                All local intelligence engines and offline Ollama bridges are synchronized.
+                CERBERUS-X Desktop v2.4.0 (Enterprise)<br />
+                All offline Ollama engines and spaCy pipeline versions are synchronized.
               </p>
               <div className="pt-2">
                 <button
