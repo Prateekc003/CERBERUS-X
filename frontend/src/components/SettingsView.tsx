@@ -51,6 +51,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
 
+        {/* spaCy Named Entity Recognition (NER) */}
+        <div className="bg-dark-card border border-dark-cardBorder rounded-xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-white font-semibold text-xs">
+              <Cpu className="w-4 h-4 text-purple-400" />
+              <span>spaCy Named Entity Recognition (NER) Engine</span>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[#16281e] text-[#4ade80] border border-[#224832]">
+              ● Active (en_core_web_sm)
+            </span>
+          </div>
+          <div className="bg-dark-sidebar p-3.5 rounded-lg border border-dark-borderSubtle text-xs font-mono space-y-1.5">
+            <p className="text-white">Model: <strong>spaCy v3.8 (en_core_web_sm)</strong></p>
+            <p className="text-slate-400 text-[11px]">
+              Extracts named entities from any user-uploaded field or document (People, Organizations, Locations, Dates, Products, Events, Quantities) with normalized disambiguation.
+            </p>
+            <p className="text-slate-500 text-[10px]">Processing: Fully local & offline • Zero paid API calls</p>
+          </div>
+        </div>
+
         {/* Database Persistence */}
         <div className="bg-dark-card border border-dark-cardBorder rounded-xl p-5 space-y-3">
           <div className="flex items-center space-x-2 text-white font-semibold text-xs">

@@ -16,7 +16,7 @@ from app.config import UPLOAD_DIR, REPORT_DIR, OLLAMA_HOST, OLLAMA_MODEL
 from app.database import engine, get_db, Base
 from app import models, schemas
 from app.services.multimodal_extractor import process_file_multimodal
-from app.services.entity_resolver import extract_entities_from_text, normalize_entity_name
+from app.services.entity_resolver import extract_entities_from_text, normalize_entity_name, get_spacy_nlp
 from app.services.contradiction_engine import extract_structured_claims, detect_conflicts_between_claims
 from app.services.reliability_engine import evaluate_evidence_reliability
 from app.services.knowledge_graph_engine import build_investigation_knowledge_graph
@@ -59,6 +59,7 @@ def on_startup():
 @app.get("/api/system/status")
 async def get_system_status():
     ollama_ok = await check_ollama_available()
+    spacy_model = get_spacy_nlp()
     return {
         "status": "ONLINE",
         "offline_first": True,
@@ -66,6 +67,8 @@ async def get_system_status():
         "ollama_host": OLLAMA_HOST,
         "ollama_model": OLLAMA_MODEL,
         "reasoning_mode": "OLLAMA_LOCAL_LLM" if ollama_ok else "RULE_BASED_INFERENCE",
+        "spacy_ner_active": spacy_model is not None,
+        "spacy_model_name": "en_core_web_sm" if spacy_model is not None else None,
         "timestamp": datetime.datetime.utcnow().isoformat()
     }
 

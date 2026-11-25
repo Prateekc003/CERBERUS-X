@@ -75,17 +75,23 @@ export const EntityResolution: React.FC<EntityResolutionProps> = ({
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-200 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-dark-cardBorder gap-4">
         <div>
-          <h1 className="text-xl font-bold text-navy-900 tracking-tight">
-            Entity Resolution & Disambiguation
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <div className="flex items-center space-x-3">
+            <h1 className="text-xl font-bold text-white tracking-tight">
+              Entity Resolution & Disambiguation
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-purple-950/60 border border-purple-800 text-purple-300 text-[10px] font-mono flex items-center space-x-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+              <span>spaCy NER (en_core_web_sm)</span>
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
             Resolves cross-document entities, identifies duplicate mentions, and allows manual investigator consolidation.
           </p>
         </div>
-        <div className="text-xs font-mono text-slate-500">
-          Resolved Entities: <strong className="text-navy-900">{entities.length}</strong>
+        <div className="text-xs font-mono text-slate-400">
+          Resolved Entities: <strong className="text-white">{entities.length}</strong>
         </div>
       </div>
 
