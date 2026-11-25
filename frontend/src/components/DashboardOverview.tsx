@@ -168,19 +168,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             CERBERUS-X
           </h1>
 
-          <p className="text-xs text-slate-400 font-sans">
-            Multimodal Evidence Analysis & Conflict-Aware Reasoning
+          <p className="text-sm text-slate-400 font-sans tracking-wide mt-1">
+            Where Evidence Meets Intelligence.
           </p>
-
-          {/* Tagline Pill */}
-          <div className="pt-2">
-            <div
-              style={{ backgroundColor: '#15151c', borderColor: '#262633' }}
-              className="px-5 py-1.5 rounded-full border text-xs text-slate-300 font-medium tracking-wide shadow-sm"
-            >
-              Evidence First. Answers Second.
-            </div>
-          </div>
         </div>
 
         {/* Eight Simple Feature Cards in 2 Rows of 4 */}
