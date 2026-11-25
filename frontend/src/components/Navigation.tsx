@@ -13,7 +13,10 @@ import {
   Settings,
   SquarePen,
   ChevronDown,
-  LogOut
+  LogOut,
+  User as UserIcon,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 export type NavTab =
@@ -36,6 +39,9 @@ interface NavigationProps {
   userName?: string;
   userEmail?: string;
   userPhotoURL?: string | null;
+  onOpenAccountInfo?: () => void;
+  theme?: 'dark' | 'light';
+  onToggleTheme?: () => void;
   onLogout?: () => Promise<void> | void;
 }
 
@@ -46,6 +52,9 @@ export const Navigation: React.FC<NavigationProps> = ({
   userName = 'Investigator',
   userEmail,
   userPhotoURL,
+  onOpenAccountInfo,
+  theme = 'dark',
+  onToggleTheme,
   onLogout,
 }) => {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -64,10 +73,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   ];
 
   return (
-    <nav
-      style={{ backgroundColor: '#131318', borderColor: '#1f1f28' }}
-      className="w-64 bg-[#131318] border-r border-[#1f1f28] flex flex-col justify-between shrink-0 select-none min-h-screen text-slate-300"
-    >
+    <nav className="w-64 bg-[#131318] border-r border-[#1f1f28] flex flex-col justify-between shrink-0 select-none min-h-screen text-slate-300">
       <div>
         {/* Brand Header */}
         <div className="pt-5 px-4 pb-4 flex items-center justify-between border-b border-[#1f1f28]/60">
@@ -99,7 +105,6 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Home */}
           <button
             onClick={() => onTabChange('home')}
-            style={activeTab === 'home' ? { backgroundColor: '#202028' } : {}}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
               activeTab === 'home'
                 ? 'bg-[#202028] text-white shadow-xs'
@@ -122,7 +127,6 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Investigations */}
           <button
             onClick={() => onTabChange('investigations')}
-            style={activeTab === 'investigations' ? { backgroundColor: '#202028' } : {}}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
               activeTab === 'investigations'
                 ? 'bg-[#202028] text-white shadow-xs'
@@ -136,7 +140,6 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Evidence Repository */}
           <button
             onClick={() => onTabChange('repository')}
-            style={activeTab === 'repository' ? { backgroundColor: '#202028' } : {}}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
               activeTab === 'repository'
                 ? 'bg-[#202028] text-white shadow-xs'
@@ -164,7 +167,6 @@ export const Navigation: React.FC<NavigationProps> = ({
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                style={isActive ? { backgroundColor: '#202028' } : {}}
                 className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-[#202028] text-white shadow-xs'
@@ -183,7 +185,6 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Reports & Output */}
           <button
             onClick={() => onTabChange('reports')}
-            style={activeTab === 'reports' ? { backgroundColor: '#202028' } : {}}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
               activeTab === 'reports'
                 ? 'bg-[#202028] text-white shadow-xs'
@@ -197,7 +198,6 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Settings */}
           <button
             onClick={() => onTabChange('settings')}
-            style={activeTab === 'settings' ? { backgroundColor: '#202028' } : {}}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
               activeTab === 'settings'
                 ? 'bg-[#202028] text-white shadow-xs'
@@ -211,15 +211,45 @@ export const Navigation: React.FC<NavigationProps> = ({
       </div>
 
       {/* User Profile at Bottom */}
-      <div style={{ borderColor: '#1f1f28' }} className="p-3 border-t border-[#1f1f28] relative">
+      <div className="p-3 border-t border-[#1f1f28] relative">
         {profileMenuOpen && (
-          <div className="mb-2 p-2.5 rounded-xl bg-[#181820] border border-[#2a2a38] shadow-xl space-y-2 text-xs">
-            <div className="px-1.5 pb-2 border-b border-[#252532]">
+          <div className="mb-2 p-2 rounded-xl bg-[#181820] border border-[#2a2a38] shadow-xl space-y-1 text-xs">
+            <div className="px-2 pb-2 border-b border-[#252532] mb-1">
               <div className="font-semibold text-white truncate">{userName}</div>
               {userEmail && (
                 <div className="text-[11px] text-slate-400 truncate">{userEmail}</div>
               )}
             </div>
+            {onOpenAccountInfo && (
+              <button
+                onClick={() => {
+                  setProfileMenuOpen(false);
+                  onOpenAccountInfo();
+                }}
+                className="w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg text-slate-200 hover:bg-[#202028] hover:text-white transition-colors"
+              >
+                <UserIcon className="w-3.5 h-3.5 text-slate-400" />
+                <span>Account Info</span>
+              </button>
+            )}
+            {onToggleTheme && (
+              <button
+                onClick={onToggleTheme}
+                className="w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg text-slate-200 hover:bg-[#202028] hover:text-white transition-colors"
+              >
+                {theme === 'dark' ? (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Dark Mode</span>
+                  </>
+                )}
+              </button>
+            )}
             {onLogout && (
               <button
                 onClick={() => {
@@ -247,10 +277,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                 className="w-7 h-7 rounded-full object-cover border border-[#2b2b38] shrink-0"
               />
             ) : (
-              <div
-                style={{ backgroundColor: '#22222d', borderColor: '#2b2b38' }}
-                className="w-7 h-7 rounded-full bg-[#22222d] text-slate-200 font-semibold text-xs flex items-center justify-center border border-[#2b2b38] shrink-0"
-              >
+              <div className="w-7 h-7 rounded-full bg-[#22222d] text-slate-200 font-semibold text-xs flex items-center justify-center border border-[#2b2b38] shrink-0">
                 {userName.charAt(0).toUpperCase()}
               </div>
             )}

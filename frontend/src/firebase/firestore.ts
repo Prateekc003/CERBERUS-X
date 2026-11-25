@@ -141,6 +141,27 @@ export async function getUserProfileFromFirestore(
 }
 
 /**
+ * Update user's full name / role in Cloud Firestore `users` collection.
+ */
+export async function updateUserProfileInFirestore(
+  uid: string,
+  updates: { fullName?: string; role?: string }
+): Promise<void> {
+  if (!db || !uid) return;
+  const userRef = doc(db, 'users', uid);
+  const payload: Record<string, any> = {};
+  if (updates.fullName?.trim()) {
+    payload.fullName = updates.fullName.trim();
+  }
+  if (updates.role?.trim()) {
+    payload['profileInformation.role'] = updates.role.trim();
+  }
+  if (Object.keys(payload).length > 0) {
+    await updateDoc(userRef, payload);
+  }
+}
+
+/**
  * Look up an email address from a username in the `usernames` collection.
  */
 export async function resolveEmailFromUsername(

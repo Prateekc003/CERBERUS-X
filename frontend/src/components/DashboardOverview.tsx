@@ -8,6 +8,7 @@ import {
   BarChart2,
   FileCheck,
   Sun,
+  Moon,
   Plus,
   ArrowUp,
   FileText,
@@ -19,6 +20,9 @@ import {
   Folder,
   X,
   Upload,
+  User as UserIcon,
+  Settings,
+  LogOut,
 } from 'lucide-react';
 import { DashboardOverview as DashboardData, Investigation } from '../types';
 
@@ -29,6 +33,13 @@ interface DashboardOverviewProps {
   onNewInvestigation: () => void;
   onAskQuery: (query: string) => void;
   onUploadFiles?: (files: FileList) => Promise<void>;
+  theme?: 'dark' | 'light';
+  onToggleTheme?: () => void;
+  userName?: string;
+  userEmail?: string;
+  userPhotoURL?: string | null;
+  onOpenAccountInfo?: () => void;
+  onLogout?: () => Promise<void> | void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -38,29 +49,41 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onNewInvestigation,
   onAskQuery,
   onUploadFiles,
+  theme = 'dark',
+  onToggleTheme,
+  userName = 'Investigator',
+  userEmail,
+  userPhotoURL,
+  onOpenAccountInfo,
+  onLogout,
 }) => {
   const [promptInput, setPromptInput] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const attachMenuRef = useRef<HTMLDivElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const [acceptFilter, setAcceptFilter] = useState<string>('*');
 
-  // Close menu on click outside
+  // Close menus on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (attachMenuRef.current && !attachMenuRef.current.contains(event.target as Node)) {
         setShowAttachMenu(false);
       }
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setShowAccountMenu(false);
+      }
     };
-    if (showAttachMenu) {
+    if (showAttachMenu || showAccountMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showAttachMenu]);
+  }, [showAttachMenu, showAccountMenu]);
 
   // Valid supported extensions for CERBERUS-X
   const VALID_EXTENSIONS = [
@@ -237,10 +260,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   ];
 
   return (
-    <div
-      style={{ backgroundColor: '#0d0d12' }}
-      className="min-h-screen flex flex-col justify-between p-6 md:p-8 max-w-6xl mx-auto text-white bg-[#0d0d12]"
-    >
+    <div className="min-h-screen flex flex-col justify-between p-6 md:p-8 max-w-6xl mx-auto text-white bg-[#0d0d12]">
       {/* Hidden file input for file selection */}
       <input
         type="file"
@@ -267,19 +287,113 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         className="hidden"
       />
 
-      {/* Top Header: Theme toggle & Avatar */}
-      <div className="flex items-center justify-end space-x-3.5 w-full">
+      {/* Top Header: Theme toggle & Account Menu */}
+      <div className="flex items-center justify-end space-x-3 w-full relative">
         <button
-          title="Theme toggle"
-          className="p-1.5 rounded-full hover:bg-[#1a1a24] text-slate-400 hover:text-white transition-colors"
+          type="button"
+          onClick={onToggleTheme}
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          aria-label={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          className="p-2 rounded-full hover:bg-[#1a1a24] text-slate-400 hover:text-white transition-colors"
         >
-          <Sun className="w-4 h-4 stroke-[1.5]" />
+          {theme === 'dark' ? (
+            <Sun className="w-4 h-4 stroke-[1.75]" />
+          ) : (
+            <Moon className="w-4 h-4 stroke-[1.75]" />
+          )}
         </button>
-        <div
-          style={{ backgroundColor: '#22222d', borderColor: '#2b2b38' }}
-          className="w-7 h-7 rounded-full bg-[#22222d] text-slate-200 text-xs font-semibold flex items-center justify-center border border-[#2b2b38]"
-        >
-          R
+
+        <div className="relative" ref={accountMenuRef}>
+          <button
+            type="button"
+            onClick={() => setShowAccountMenu((prev) => !prev)}
+            title="Account Info & Settings"
+            aria-label="Account Info"
+            className="w-8 h-8 rounded-full bg-[#22222d] hover:border-slate-500 text-slate-200 text-xs font-semibold flex items-center justify-center border border-[#2b2b38] overflow-hidden transition-colors"
+          >
+            {userPhotoURL ? (
+              <img
+                src={userPhotoURL}
+                alt={userName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span>{userName.charAt(0).toUpperCase()}</span>
+            )}
+          </button>
+
+          {showAccountMenu && (
+            <div className="absolute right-0 mt-2 w-60 bg-[#1e1e26] border border-[#2e2e3b] rounded-2xl p-2 shadow-2xl z-50 text-xs">
+              <div className="px-3 py-2.5 border-b border-[#2a2a38] mb-1">
+                <div className="font-semibold text-white truncate">{userName}</div>
+                {userEmail && (
+                  <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                    {userEmail}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAccountMenu(false);
+                  onOpenAccountInfo?.();
+                }}
+                className="w-full text-left px-3 py-2 rounded-xl text-slate-200 hover:bg-[#282834] hover:text-white transition-colors flex items-center space-x-2.5"
+              >
+                <UserIcon className="w-4 h-4 text-slate-400" />
+                <span>Account Info</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onToggleTheme?.();
+                }}
+                className="w-full text-left px-3 py-2 rounded-xl text-slate-200 hover:bg-[#282834] hover:text-white transition-colors flex items-center space-x-2.5"
+              >
+                {theme === 'dark' ? (
+                  <>
+                    <Sun className="w-4 h-4 text-amber-400" />
+                    <span>Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-4 h-4 text-blue-400" />
+                    <span>Dark Mode</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAccountMenu(false);
+                  onNavigate('settings');
+                }}
+                className="w-full text-left px-3 py-2 rounded-xl text-slate-200 hover:bg-[#282834] hover:text-white transition-colors flex items-center space-x-2.5"
+              >
+                <Settings className="w-4 h-4 text-slate-400" />
+                <span>Settings</span>
+              </button>
+
+              {onLogout && (
+                <div className="pt-1 mt-1 border-t border-[#2a2a38]">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowAccountMenu(false);
+                      await onLogout();
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-rose-300 hover:bg-rose-950/50 hover:text-rose-200 transition-colors flex items-center space-x-2.5"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -312,7 +426,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             return (
               <div
                 key={card.id}
-                style={{ backgroundColor: '#17171e', borderColor: '#23232f' }}
                 className="bg-[#17171e] border border-[#23232f] p-5 rounded-2xl flex flex-col items-center text-center cursor-default select-none transition-all shadow-sm min-h-[125px] justify-center"
               >
                 <div className="w-8 h-8 flex items-center justify-center text-white mb-2">
@@ -334,8 +447,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <div className="w-full max-w-4xl mx-auto pt-4 relative">
         <form
           onSubmit={handlePromptSubmit}
-          style={{ backgroundColor: '#171720', borderColor: '#262633' }}
-          className="rounded-3xl border border-[#262633] p-4 flex flex-col space-y-3 shadow-2xl focus-within:border-slate-500 transition-colors relative"
+          className="bg-[#171720] rounded-3xl border border-[#262633] p-4 flex flex-col space-y-3 shadow-2xl focus-within:border-slate-500 transition-colors relative"
         >
           {/* Attached Files Chips inside the Chat Input */}
           {attachedFiles.length > 0 && (
@@ -357,7 +469,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 return (
                   <div
                     key={`${file.name}-${idx}`}
-                    style={{ backgroundColor: '#21212d', borderColor: '#2f2f3d' }}
                     className="flex items-center space-x-2 px-2.5 py-1.5 rounded-xl border border-[#2f2f3d] bg-[#21212d] text-xs text-slate-200 animate-in fade-in"
                   >
                     <ChipIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -411,7 +522,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               {/* Floating dark popup menu matching ChatGPT desktop */}
               {showAttachMenu && (
                 <div
-                  style={{ backgroundColor: '#1e1e26', borderColor: '#2e2e3b' }}
                   className="absolute bottom-full mb-3 left-0 w-64 bg-[#1e1e26] border border-[#2e2e3b] rounded-2xl p-1.5 shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-100"
                 >
                   <div className="flex flex-col space-y-0.5">

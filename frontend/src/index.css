@@ -63,3 +63,102 @@
 .animate-cerberus-float {
   animation: cerberusFloat 4.8s ease-in-out infinite;
 }
+
+/* =========================================================
+   LIGHT MODE THEME OVERRIDES (applied when html.light-mode)
+   ========================================================= */
+html.light-mode,
+html.light-mode body,
+html.light-mode #root {
+  background-color: #f4f6f9 !important;
+  color: #0f172a !important;
+}
+
+html.light-mode .bg-dark-bg,
+html.light-mode .bg-\[\#0d0d12\] {
+  background-color: #f4f6f9 !important;
+  color: #0f172a !important;
+}
+
+html.light-mode .bg-dark-sidebar,
+html.light-mode .bg-\[\#131318\],
+html.light-mode .bg-\[\#101017\],
+html.light-mode .bg-\[\#14141b\] {
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+}
+
+html.light-mode .bg-dark-card,
+html.light-mode .bg-\[\#17171e\],
+html.light-mode .bg-\[\#171720\],
+html.light-mode .bg-\[\#181820\],
+html.light-mode .bg-\[\#1b1b24\],
+html.light-mode .bg-\[\#1e1e26\] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html.light-mode .bg-dark-cardHover,
+html.light-mode .bg-dark-activeNav,
+html.light-mode .bg-dark-input,
+html.light-mode .bg-\[\#1a1a22\],
+html.light-mode .bg-\[\#202028\],
+html.light-mode .bg-\[\#21212d\],
+html.light-mode .bg-\[\#22222d\],
+html.light-mode .hover\:bg-\[\#1a1a22\]:hover,
+html.light-mode .hover\:bg-\[\#1a1a24\]:hover,
+html.light-mode .hover\:bg-\[\#1e1e28\]:hover {
+  background-color: #eef2f6 !important;
+}
+
+html.light-mode .border-dark-cardBorder,
+html.light-mode .border-dark-borderSubtle,
+html.light-mode .border-\[\#1f1f28\],
+html.light-mode .border-\[\#23232f\],
+html.light-mode .border-\[\#242432\],
+html.light-mode .border-\[\#262633\],
+html.light-mode .border-\[\#2a2a38\],
+html.light-mode .border-\[\#2b2b38\],
+html.light-mode .border-\[\#2e2e3b\],
+html.light-mode .border-\[\#2f2f3d\] {
+  border-color: #e2e8f0 !important;
+}
+
+html.light-mode .text-white {
+  color: #0f172a !important;
+}
+
+html.light-mode .text-slate-100,
+html.light-mode .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html.light-mode .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light-mode .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* Primary solid buttons inverted cleanly in Light Mode */
+html.light-mode button.bg-white {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+html.light-mode button.bg-white:hover {
+  background-color: #1e293b !important;
+}
+
+html.light-mode button.bg-white .text-black {
+  color: #ffffff !important;
+}
+
+html.light-mode ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+html.light-mode ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}

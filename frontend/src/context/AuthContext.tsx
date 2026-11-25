@@ -30,6 +30,7 @@ import {
   UserProfileData,
   syncUserProfileToFirestore,
   getUserProfileFromFirestore,
+  updateUserProfileInFirestore,
   resolveEmailFromUsername,
 } from '../firebase/firestore';
 
@@ -55,6 +56,7 @@ interface AuthContextValue {
   sendPasswordReset: (email: string) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
   refreshAuthUser: () => Promise<void>;
+  updateUserProfileInfo: (fullName: string, role?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -259,10 +261,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const firebaseAuth = ensureConfigured();
     if (firebaseAuth.currentUser) {
       await firebaseAuth.currentUser.reload();
-      setUser({ ...firebaseAuth.currentUser });
-      await syncUserProfileToFirestore(firebaseAuth.currentUser);
+      const updated = await syncUserProfileToFirestore(firebaseAuth.currentUser);
+      if (updated) setUserProfile({ ...updated });
     }
   }, []);
+
+  const updateUserProfileInfo = useCallback(
+    async (fullName: string, role?: string) => {
+      const firebaseAuth = ensureConfigured();
+      if (!firebaseAuth.currentUser) {
+        throw new Error('No active user session found.');
+      }
+      if (fullName.trim()) {
+        await updateProfile(firebaseAuth.currentUser, {
+          displayName: fullName.trim(),
+        });
+      }
+      await updateUserProfileInFirestore(firebaseAuth.currentUser.uid, {
+        fullName,
+        role,
+      });
+      const updated = await getUserProfileFromFirestore(
+        firebaseAuth.currentUser.uid
+      );
+      if (updated) {
+        setUserProfile(updated);
+      }
+    },
+    []
+  );
 
   const logout = useCallback(async () => {
     if (!auth) return;
@@ -286,6 +313,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         sendPasswordReset,
         resendVerificationEmail,
         refreshAuthUser,
+        updateUserProfileInfo,
         logout,
       }}
     >

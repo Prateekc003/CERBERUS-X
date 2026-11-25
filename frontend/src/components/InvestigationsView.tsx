@@ -18,10 +18,7 @@ export const InvestigationsView: React.FC<InvestigationsViewProps> = ({
   onNavigate,
 }) => {
   return (
-    <div
-      style={{ backgroundColor: '#0d0d12' }}
-      className="min-h-screen p-8 max-w-5xl mx-auto space-y-6 text-white bg-[#0d0d12]"
-    >
+    <div className="min-h-screen p-8 max-w-5xl mx-auto space-y-6 text-white bg-[#0d0d12]">
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-[#23232f]">
         <div>
@@ -53,17 +50,14 @@ export const InvestigationsView: React.FC<InvestigationsViewProps> = ({
                 onSelectInvestigation(inv);
                 onNavigate('home');
               }}
-              style={{
-                backgroundColor: isSelected ? '#1b1b24' : '#17171e',
-                borderColor: isSelected ? '#3b82f6' : '#23232f',
-              }}
-              className="p-5 rounded-2xl border hover:border-slate-500 cursor-pointer transition-all flex items-center justify-between shadow-md"
+              className={`p-5 rounded-2xl border hover:border-slate-500 cursor-pointer transition-all flex items-center justify-between shadow-md ${
+                isSelected
+                  ? 'bg-[#1b1b24] border-blue-500'
+                  : 'bg-[#17171e] border-[#23232f]'
+              }`}
             >
               <div className="flex items-center space-x-4">
-                <div
-                  style={{ backgroundColor: '#131318' }}
-                  className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-300"
-                >
+                <div className="w-11 h-11 rounded-xl bg-[#131318] flex items-center justify-center text-slate-300">
                   <Folder className={`w-5 h-5 ${isSelected ? 'text-blue-400' : 'text-slate-400'}`} />
                 </div>
                 <div>

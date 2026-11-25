@@ -19,6 +19,7 @@ import {
   getUserInvestigationsFromFirestore,
 } from './firebase/firestore';
 import { AuthPage } from './components/AuthPage';
+import { AccountInfoModal } from './components/AccountInfoModal';
 import { Navigation, NavTab } from './components/Navigation';
 import { DashboardOverview } from './components/DashboardOverview';
 import { EvidenceUploadCenter } from './components/EvidenceUploadCenter';
@@ -66,6 +67,24 @@ export const App: React.FC = () => {
   const [errorNotification, setErrorNotification] = useState<string | null>(null);
   const [verificationDismissed, setVerificationDismissed] = useState(false);
   const [verificationMsg, setVerificationMsg] = useState<string | null>(null);
+  const [showAccountInfo, setShowAccountInfo] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('cerberus_theme');
+    return saved === 'light' ? 'light' : 'dark';
+  });
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('cerberus_theme', theme);
+    if (user && theme === 'light') {
+      document.documentElement.classList.add('light-mode');
+    } else {
+      document.documentElement.classList.remove('light-mode');
+    }
+  }, [theme, user]);
 
   // Load initial system status and investigations only when authenticated
   const loadInitialData = useCallback(async () => {
@@ -351,7 +370,7 @@ export const App: React.FC = () => {
     !verificationDismissed;
 
   return (
-    <div style={{ backgroundColor: '#0d0d12', minHeight: '100vh' }} className="min-h-screen bg-[#0d0d12] flex font-sans text-slate-200 antialiased selection:bg-slate-700 selection:text-white">
+    <div className="min-h-screen bg-[#0d0d12] flex font-sans text-slate-200 antialiased selection:bg-slate-700 selection:text-white">
       {/* Sleek Sidebar matching Image */}
       <Navigation
         activeTab={activeTab}
@@ -363,6 +382,9 @@ export const App: React.FC = () => {
         userName={displayUserName}
         userEmail={user.email || undefined}
         userPhotoURL={user.photoURL}
+        onOpenAccountInfo={() => setShowAccountInfo(true)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
         onLogout={async () => {
           await logout();
           setActiveTab('home');
@@ -370,7 +392,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main App Content Viewport */}
-      <main style={{ backgroundColor: '#0d0d12' }} className="flex-1 overflow-y-auto bg-[#0d0d12] min-h-screen flex flex-col justify-between">
+      <main className="flex-1 overflow-y-auto bg-[#0d0d12] min-h-screen flex flex-col justify-between">
         {needsEmailVerification && (
           <div className="mx-6 mt-5 p-3.5 rounded-xl bg-amber-950/35 border border-amber-900/50 text-amber-200 text-xs flex flex-wrap justify-between items-center gap-3 shadow">
             <div className="flex items-center space-x-2.5">
@@ -437,6 +459,16 @@ export const App: React.FC = () => {
             onUploadFiles={async (files) => {
               await handleUploadEvidence(Array.from(files));
               setActiveTab('repository');
+            }}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            userName={displayUserName}
+            userEmail={user.email || undefined}
+            userPhotoURL={user.photoURL}
+            onOpenAccountInfo={() => setShowAccountInfo(true)}
+            onLogout={async () => {
+              await logout();
+              setActiveTab('home');
             }}
           />
         )}
@@ -605,6 +637,13 @@ export const App: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Modal: Account Information */}
+      <AccountInfoModal
+        isOpen={showAccountInfo}
+        onClose={() => setShowAccountInfo(false)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
     </div>
   );
 };
