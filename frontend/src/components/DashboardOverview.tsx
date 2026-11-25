@@ -71,56 +71,48 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       title: 'Upload Evidence',
       description: 'PDF, images, tables, datasets and more',
       icon: Upload,
-      action: () => onNavigate('repository'),
     },
     {
       id: 'analyse',
       title: 'Analyse Evidence',
       description: 'Extract and understand key information',
       icon: Search,
-      action: () => onNavigate('analysis'),
     },
     {
       id: 'graph',
       title: 'Build Knowledge Graph',
       description: 'Connect evidence, people, events and claims',
       icon: Share2,
-      action: () => onNavigate('graph'),
     },
     {
       id: 'conflicts',
       title: 'Detect Conflicts',
       description: 'Find contradictory or mismatching claims',
       icon: ArrowRightLeft,
-      action: () => onNavigate('conflicts'),
     },
     {
       id: 'reliability',
       title: 'Reliability Scoring',
       description: 'Evaluate source trustworthiness',
       icon: ShieldCheck,
-      action: () => onNavigate('reliability'),
     },
     {
       id: 'entities',
       title: 'Entity Resolution',
       description: 'Identify and merge same entities',
       icon: Users,
-      action: () => onNavigate('entities'),
     },
     {
       id: 'reasoning',
       title: 'Evidence Reasoning',
       description: 'Get AI-based, evidence-grounded answers',
       icon: FileCheck,
-      action: () => onNavigate('assistant'),
     },
     {
       id: 'report',
       title: 'Generate Report',
       description: 'Create a complete investigation report',
       icon: BarChart2,
-      action: () => onNavigate('reports'),
     },
   ];
 
@@ -180,11 +172,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             return (
               <div
                 key={card.id}
-                onClick={card.action}
                 style={{ backgroundColor: '#17171e', borderColor: '#23232f' }}
-                className="bg-[#17171e] border border-[#23232f] hover:border-slate-600 hover:bg-[#1b1b24] p-5 rounded-2xl flex flex-col items-center text-center cursor-pointer transition-all shadow-sm group min-h-[125px] justify-center"
+                className="bg-[#17171e] border border-[#23232f] p-5 rounded-2xl flex flex-col items-center text-center cursor-default select-none transition-all shadow-sm min-h-[125px] justify-center"
               >
-                <div className="w-8 h-8 flex items-center justify-center text-white mb-2 group-hover:scale-105 transition-transform">
+                <div className="w-8 h-8 flex items-center justify-center text-white mb-2">
                   <Icon className="w-5 h-5 stroke-[1.5] text-white" />
                 </div>
                 <h3 className="text-xs font-bold text-white tracking-tight">
