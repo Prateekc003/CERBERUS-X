@@ -21,9 +21,13 @@ import { ReportDossier } from './components/ReportDossier';
 import { AssistantChat } from './components/AssistantChat';
 import { SettingsView } from './components/SettingsView';
 import { EvidenceDetailModal } from './components/EvidenceDetailModal';
+import { ContradictionCenter } from './components/ContradictionCenter';
+import { ReliabilityAssessment } from './components/ReliabilityAssessment';
+import { EntityResolution } from './components/EntityResolution';
+import { InvestigationsView } from './components/InvestigationsView';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<NavTab | 'assistant'>('dashboard');
+  const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [currentInvestigation, setCurrentInvestigation] = useState<Investigation | null>(null);
 
@@ -114,7 +118,7 @@ export const App: React.FC = () => {
       if (demo) {
         setCurrentInvestigation(demo);
       }
-      setActiveTab('dashboard');
+      setActiveTab('home');
     } catch (err: any) {
       console.error('Demo seed error:', err);
       setErrorNotification('Failed to execute demo seed.');
@@ -135,7 +139,7 @@ export const App: React.FC = () => {
       setIsCreatingCase(false);
       setNewCaseTitle('');
       setNewCaseDesc('');
-      setActiveTab('upload');
+      setActiveTab('repository');
     } catch (err: any) {
       console.error('Failed to create case:', err);
       setErrorNotification('Error creating investigation.');
@@ -243,7 +247,7 @@ export const App: React.FC = () => {
     <div style={{ backgroundColor: '#0d0d12', minHeight: '100vh' }} className="min-h-screen bg-[#0d0d12] flex font-sans text-slate-200 antialiased selection:bg-slate-700 selection:text-white">
       {/* Sleek Sidebar matching Image */}
       <Navigation
-        activeTab={activeTab === 'assistant' ? 'dashboard' : activeTab}
+        activeTab={activeTab}
         onTabChange={(tab) => {
           setActiveTab(tab);
           setPendingAssistantQuery('');
@@ -266,19 +270,34 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* 1. Dashboard View (Matches User's Reference Image) */}
-        {activeTab === 'dashboard' && (
+        {/* 1. Home Screen (Matches User's Reference Image & 8 Cards Hub) */}
+        {activeTab === 'home' && (
           <DashboardOverview
             data={dashboardData}
             currentInvestigation={currentInvestigation}
             onNavigate={(tab) => setActiveTab(tab)}
             onNewInvestigation={() => setIsCreatingCase(true)}
             onAskQuery={handleAskFromDashboard}
+            onUploadFiles={async (files) => {
+              await handleUploadEvidence(Array.from(files));
+              setActiveTab('repository');
+            }}
           />
         )}
 
-        {/* 2. Upload Evidence View */}
-        {activeTab === 'upload' && (
+        {/* 2. Investigations Case Files View */}
+        {activeTab === 'investigations' && (
+          <InvestigationsView
+            investigations={investigations}
+            currentInvestigation={currentInvestigation}
+            onSelectInvestigation={(inv) => setCurrentInvestigation(inv)}
+            onNewInvestigation={() => setIsCreatingCase(true)}
+            onNavigate={(tab) => setActiveTab(tab)}
+          />
+        )}
+
+        {/* 3. Evidence Repository / Upload View */}
+        {activeTab === 'repository' && (
           <EvidenceUploadCenter
             evidence={evidence}
             currentInvestigation={currentInvestigation}
@@ -289,7 +308,7 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* 3. Evidence Analysis View (Contradictions, Claims, Entities, Reliability) */}
+        {/* 4. Evidence Analysis View (Comprehensive Hub) */}
         {activeTab === 'analysis' && (
           <EvidenceAnalysis
             conflicts={conflicts}
@@ -302,12 +321,35 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* 4. Knowledge Graph View */}
+        {/* 5. Knowledge Graph View */}
         {activeTab === 'graph' && (
           <KnowledgeGraph graphData={graphData} onRefresh={refreshCaseData} />
         )}
 
-        {/* 5. Investigation Report View */}
+        {/* 6. Conflict Detection View */}
+        {activeTab === 'conflicts' && (
+          <ContradictionCenter
+            conflicts={conflicts}
+            onUpdateStatus={handleUpdateConflictStatus}
+            loading={loading}
+          />
+        )}
+
+        {/* 7. Reliability Scoring View */}
+        {activeTab === 'reliability' && (
+          <ReliabilityAssessment items={reliability} />
+        )}
+
+        {/* 8. Entity Resolution View */}
+        {activeTab === 'entities' && (
+          <EntityResolution
+            entities={entities}
+            onMergeEntities={handleMergeEntities}
+            loading={loading}
+          />
+        )}
+
+        {/* 9. Investigation Report & Dossier View */}
         {activeTab === 'reports' && (
           <ReportDossier
             currentInvestigation={currentInvestigation}
@@ -317,7 +359,7 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* 6. Settings View */}
+        {/* 10. Settings View */}
         {activeTab === 'settings' && (
           <SettingsView
             systemStatus={systemStatus}
@@ -326,7 +368,7 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* 7. AI Assistant Chat View */}
+        {/* 11. AI Assistant Chat View (Evidence Reasoning) */}
         {activeTab === 'assistant' && (
           <AssistantChat
             currentInvestigation={currentInvestigation}
