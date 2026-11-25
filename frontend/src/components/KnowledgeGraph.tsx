@@ -8,16 +8,19 @@ import {
   useEdgesState,
   Handle,
   Position,
-  NodeProps
+  NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
   Share2,
   FileText,
-  CheckCircle,
-  Network,
-  AlertTriangle,
-  RotateCcw
+  FileSpreadsheet,
+  Image as ImageIcon,
+  Box,
+  RotateCcw,
+  MapPin,
+  Building,
+  User,
 } from 'lucide-react';
 import { KnowledgeGraphData } from '../types';
 
@@ -27,75 +30,121 @@ interface KnowledgeGraphProps {
 }
 
 interface CustomNodeData {
-  nodeType?: string;
-  hasConflict?: boolean;
+  nodeType?: 'PROJECT' | 'DOCUMENT' | 'CLAIM' | 'ENTITY';
   category?: string;
   label?: string;
   sublabel?: string;
+  isOrange?: boolean;
+  hasConflict?: boolean;
   payload?: any;
 }
 
 const CustomNode: React.FC<NodeProps> = ({ data, selected }) => {
   const nodeData = data as unknown as CustomNodeData;
   const nodeType = nodeData.nodeType || 'CLAIM';
-  const hasConflict = nodeData.hasConflict || false;
 
-  let borderColor = 'border-dark-cardBorder';
-  let headerBg = 'bg-dark-sidebar text-slate-300';
-  let icon = <CheckCircle className="w-3.5 h-3.5 text-slate-400" />;
-
-  if (nodeType === 'DOCUMENT') {
-    borderColor = 'border-blue-600/50';
-    headerBg = 'bg-blue-950/40 text-blue-300 border-b border-blue-900/40';
-    icon = <FileText className="w-3.5 h-3.5 text-blue-400" />;
-  } else if (nodeType === 'ENTITY') {
-    borderColor = 'border-indigo-600/40';
-    headerBg = 'bg-indigo-950/40 text-indigo-300 border-b border-indigo-900/40';
-    icon = <Network className="w-3.5 h-3.5 text-indigo-400" />;
-  } else if (nodeType === 'CLAIM') {
-    if (hasConflict) {
-      borderColor = 'border-rose-500/80 ring-2 ring-rose-500/20';
-      headerBg = 'bg-rose-950/50 text-rose-300 border-b border-rose-900/50';
-      icon = <AlertTriangle className="w-3.5 h-3.5 text-rose-400 animate-pulse" />;
-    } else {
-      borderColor = 'border-dark-cardBorder';
-      headerBg = 'bg-dark-sidebar text-slate-300 border-b border-dark-cardBorder';
-      icon = <CheckCircle className="w-3.5 h-3.5 text-slate-400" />;
+  const getDocIcon = (filename?: string) => {
+    const ext = (filename || '').split('.').pop()?.toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+      return <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />;
     }
+    if (ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'webp') {
+      return <ImageIcon className="w-4 h-4 text-emerald-400 shrink-0" />;
+    }
+    return <FileText className="w-4 h-4 text-emerald-400 shrink-0" />;
+  };
+
+  // Multiple hidden handles so edges connect cleanly in all 4 directions
+  const renderHandles = () => (
+    <>
+      <Handle type="target" position={Position.Top} id="t-in" className="!w-2 !h-2 !opacity-0" />
+      <Handle type="source" position={Position.Top} id="t-out" className="!w-2 !h-2 !opacity-0" />
+      <Handle type="target" position={Position.Bottom} id="b-in" className="!w-2 !h-2 !opacity-0" />
+      <Handle type="source" position={Position.Bottom} id="b-out" className="!w-2 !h-2 !opacity-0" />
+      <Handle type="target" position={Position.Left} id="l-in" className="!w-2 !h-2 !opacity-0" />
+      <Handle type="source" position={Position.Left} id="l-out" className="!w-2 !h-2 !opacity-0" />
+      <Handle type="target" position={Position.Right} id="r-in" className="!w-2 !h-2 !opacity-0" />
+      <Handle type="source" position={Position.Right} id="r-out" className="!w-2 !h-2 !opacity-0" />
+    </>
+  );
+
+  // 1. PROJECT HUB NODE (Center 3D Isometric Cube Box)
+  if (nodeType === 'PROJECT') {
+    return (
+      <div
+        className={`bg-[#0f172a] border-2 border-blue-500 rounded-2xl px-6 py-4 shadow-[0_0_35px_rgba(59,130,246,0.35)] min-w-[210px] text-center transition-all ${
+          selected ? 'ring-2 ring-white shadow-2xl' : ''
+        }`}
+      >
+        {renderHandles()}
+        <div className="flex justify-center mb-1.5">
+          <Box className="w-7 h-7 text-blue-400 stroke-[1.75]" />
+        </div>
+        <h3 className="font-bold text-white text-sm tracking-tight leading-snug">
+          {nodeData.label || 'Medical Supply Project'}
+        </h3>
+        <p className="text-[10px] text-blue-400 font-mono tracking-widest font-semibold uppercase mt-0.5">
+          {nodeData.sublabel || 'PROJECT'}
+        </p>
+      </div>
+    );
   }
 
-  const nodeWidth = nodeType === 'ENTITY' ? 'w-56' : 'w-64';
+  // 2. DOCUMENT NODE (Green Pill with File Icon)
+  if (nodeType === 'DOCUMENT') {
+    return (
+      <div
+        className={`bg-[#0c1f17] border border-emerald-500/80 rounded-xl px-4 py-2.5 shadow-[0_0_18px_rgba(16,185,129,0.18)] flex items-center space-x-2.5 min-w-[170px] max-w-[220px] transition-all ${
+          selected ? 'ring-2 ring-white shadow-2xl' : ''
+        }`}
+      >
+        {renderHandles()}
+        {getDocIcon(nodeData.label)}
+        <span className="font-medium text-white text-xs truncate">
+          {nodeData.label || 'Document.pdf'}
+        </span>
+      </div>
+    );
+  }
 
+  // 3. CLAIM NODE (Indigo/Purple or Orange Box with Bold Assertion & Subtitle)
+  if (nodeType === 'CLAIM') {
+    const isOrange = nodeData.isOrange || false;
+    const borderBg = isOrange
+      ? 'border-orange-500/80 bg-[#241510] shadow-[0_0_20px_rgba(249,115,22,0.18)]'
+      : 'border-indigo-500/80 bg-[#161428] shadow-[0_0_20px_rgba(99,102,241,0.18)]';
+
+    return (
+      <div
+        className={`border ${borderBg} rounded-xl px-4 py-2.5 min-w-[180px] max-w-[230px] text-center transition-all ${
+          selected ? 'ring-2 ring-white shadow-2xl' : ''
+        }`}
+      >
+        {renderHandles()}
+        <h4 className="font-bold text-white text-xs leading-snug">
+          {nodeData.label || 'Factual Claim'}
+        </h4>
+        <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+          {nodeData.sublabel || 'Claim Ref'}
+        </p>
+      </div>
+    );
+  }
+
+  // 4. ENTITY NODE (Purple Pill with Entity Type Subtitle)
   return (
     <div
-      className={`bg-dark-card rounded-xl border ${borderColor} ${
-        selected ? 'ring-2 ring-blue-500 shadow-lg' : ''
-      } ${nodeWidth} text-left transition-all overflow-hidden font-sans text-xs shadow-md`}
+      className={`bg-[#161428] border border-indigo-500/80 rounded-xl px-5 py-2.5 min-w-[170px] max-w-[220px] text-center shadow-[0_0_20px_rgba(99,102,241,0.18)] transition-all ${
+        selected ? 'ring-2 ring-white shadow-2xl' : ''
+      }`}
     >
-      <Handle type="target" position={Position.Left} className="w-2 h-2" />
-      <div className={`px-3 py-1.5 flex items-center justify-between font-mono text-[10px] ${headerBg}`}>
-        <div className="flex items-center space-x-1.5 truncate">
-          {icon}
-          <span className="font-bold truncate">{nodeData.category || nodeType}</span>
-        </div>
-        {hasConflict && (
-          <span className="bg-rose-600 text-white font-bold text-[9px] px-1.5 py-0.2 rounded">
-            CONFLICT
-          </span>
-        )}
-      </div>
-
-      <div className="p-3 space-y-1">
-        <p className="font-semibold text-white text-[11px] leading-snug line-clamp-2">
-          {nodeData.label || 'Node'}
-        </p>
-        {nodeData.sublabel && (
-          <p className="text-[10px] text-slate-400 font-mono line-clamp-2">
-            {nodeData.sublabel}
-          </p>
-        )}
-      </div>
-      <Handle type="source" position={Position.Right} className="w-2 h-2" />
+      {renderHandles()}
+      <h4 className="font-bold text-white text-xs leading-snug">
+        {nodeData.label || 'Entity Name'}
+      </h4>
+      <p className="text-[10px] text-indigo-300/80 font-mono mt-0.5 capitalize">
+        {nodeData.sublabel || 'Location'}
+      </p>
     </div>
   );
 };
@@ -104,67 +153,45 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ graphData, onRef
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
-  const [filterType, setFilterType] = useState<string>('ALL');
 
   const nodeTypes = useMemo(() => ({ customNode: CustomNode }), []);
 
   useEffect(() => {
     if (graphData && graphData.nodes) {
-      let filteredNodes = graphData.nodes;
-      if (filterType !== 'ALL') {
-        filteredNodes = graphData.nodes.filter((n) => n.data.nodeType === filterType);
-      }
-      setNodes(filteredNodes as any);
+      setNodes(graphData.nodes as any);
       setEdges(graphData.edges as any);
     }
-  }, [graphData, filterType, setNodes, setEdges]);
+  }, [graphData, setNodes, setEdges]);
 
   const onNodeClick = useCallback((_: any, node: any) => {
     setSelectedNode(node);
   }, []);
 
   return (
-    <div className="p-7 space-y-4 max-w-7xl mx-auto h-[calc(100vh-4.5rem)] flex flex-col text-slate-200">
-      {/* Module Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-dark-borderSubtle gap-3 shrink-0">
+    <div className="p-6 md:p-8 space-y-4 max-w-7xl mx-auto h-[calc(100vh-4.5rem)] flex flex-col text-slate-200">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#22222d] gap-3 shrink-0">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight flex items-center space-x-2">
             <Share2 className="w-5 h-5 text-blue-400" />
             <span>Knowledge Graph</span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Interactive graph linking evidence documents, claims, entities, and conflicts.
+            Radial evidentiary network connecting case documents, claims, and key entities.
           </p>
         </div>
 
-        {/* Filter controls */}
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-1.5 text-xs font-mono">
-            <span className="text-slate-400">Filter Nodes:</span>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="text-xs bg-dark-input border border-dark-cardBorder text-slate-200 rounded px-2.5 py-1 focus:outline-none"
-            >
-              <option value="ALL">All Nodes ({graphData?.stats.total_nodes || 0})</option>
-              <option value="DOCUMENT">Documents ({graphData?.stats.documents_count || 0})</option>
-              <option value="CLAIM">Claims ({graphData?.stats.claims_count || 0})</option>
-              <option value="ENTITY">Entities ({graphData?.stats.entities_count || 0})</option>
-            </select>
-          </div>
-
-          <button
-            onClick={onRefresh}
-            className="text-xs px-2.5 py-1 rounded border border-dark-cardBorder hover:bg-dark-cardHover text-slate-300 font-mono flex items-center space-x-1"
-          >
-            <RotateCcw className="w-3 h-3" />
-            <span>Reset Layout</span>
-          </button>
-        </div>
+        <button
+          onClick={onRefresh}
+          className="text-xs px-3 py-1.5 rounded-lg border border-[#2a2a38] hover:bg-[#1f1f2b] text-slate-300 font-mono flex items-center space-x-1.5 transition-colors"
+        >
+          <RotateCcw className="w-3 h-3" />
+          <span>Reset Layout</span>
+        </button>
       </div>
 
-      {/* Main Canvas & Inspection Side Panel */}
-      <div className="flex-1 border border-dark-cardBorder rounded-xl overflow-hidden relative bg-dark-bg flex shadow-inner">
+      {/* Main Graph Canvas */}
+      <div className="flex-1 border border-[#22222d] rounded-2xl overflow-hidden relative bg-[#090a10] flex shadow-2xl">
         <div className="flex-1 h-full w-full">
           <ReactFlow
             nodes={nodes}
@@ -174,56 +201,55 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ graphData, onRef
             nodeTypes={nodeTypes}
             onNodeClick={onNodeClick}
             fitView
-            fitViewOptions={{ padding: 0.15 }}
-            minZoom={0.2}
+            fitViewOptions={{ padding: 0.2 }}
+            minZoom={0.3}
             maxZoom={2}
           >
-            <Background color="#1d1d28" gap={20} size={1.5} />
-            <Controls className="bg-dark-card border border-dark-cardBorder text-slate-200 shadow-md rounded" />
+            <Background color="#161826" gap={24} size={1} />
+            <Controls className="!bg-[#14141b] !border !border-[#2a2a38] !text-slate-200 shadow-xl rounded-lg" />
             <MiniMap
               nodeColor={(node: any) => {
-                if (node.data.nodeType === 'DOCUMENT') return '#2563eb';
-                if (node.data.hasConflict) return '#f43f5e';
-                if (node.data.nodeType === 'ENTITY') return '#818cf8';
-                return '#64748b';
+                if (node.data.nodeType === 'PROJECT') return '#3b82f6';
+                if (node.data.nodeType === 'DOCUMENT') return '#10b981';
+                if (node.data.isOrange) return '#f97316';
+                return '#818cf8';
               }}
-              style={{ width: 130, height: 80 }}
+              style={{ width: 120, height: 75 }}
               className="!bg-[#14141b] !border !border-[#2a2a38] rounded-lg shadow-xl"
             />
           </ReactFlow>
 
-          {/* Legend Banner */}
-          <div className="absolute bottom-3 left-3 bg-dark-card/90 border border-dark-cardBorder rounded-lg p-2.5 text-[10px] font-mono shadow-md flex items-center space-x-3 text-slate-300 backdrop-blur-xs">
-            <span className="font-bold uppercase text-white">Legend:</span>
-            <div className="flex items-center space-x-1">
-              <span className="w-2.5 h-2.5 rounded bg-blue-500 inline-block" />
+          {/* Clean Radial Legend */}
+          <div className="absolute bottom-3 left-3 bg-[#12131c]/90 border border-[#262838] rounded-xl px-3.5 py-2 text-[10px] font-mono shadow-xl flex items-center space-x-3.5 text-slate-300 backdrop-blur-md">
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-blue-500 inline-block shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+              <span>Project Hub</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
               <span>Document</span>
             </div>
-            <div className="flex items-center space-x-1">
-              <span className="w-2.5 h-2.5 rounded bg-slate-400 inline-block" />
-              <span>Verified Claim</span>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-indigo-500 inline-block shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+              <span>Claim / Entity</span>
             </div>
-            <div className="flex items-center space-x-1">
-              <span className="w-2.5 h-2.5 rounded bg-rose-500 inline-block animate-pulse" />
-              <span>Contradiction</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <span className="w-2.5 h-2.5 rounded bg-indigo-500 inline-block" />
-              <span>Resolved Entity</span>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-orange-500 inline-block shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+              <span>Audit Discrepancy</span>
             </div>
           </div>
         </div>
 
         {/* Node Inspector Side Panel */}
         {selectedNode && (
-          <div className="w-80 bg-dark-card border-l border-dark-cardBorder p-4 overflow-y-auto space-y-3 shrink-0 shadow-xl z-10 text-xs text-slate-300">
-            <div className="flex items-center justify-between pb-2 border-b border-dark-borderSubtle">
+          <div className="w-80 bg-[#12131c] border-l border-[#22222d] p-5 overflow-y-auto space-y-4 shrink-0 shadow-2xl z-10 text-xs text-slate-300">
+            <div className="flex items-center justify-between pb-2 border-b border-[#22222d]">
               <span className="font-mono text-[10px] uppercase font-bold text-blue-400">
                 {selectedNode.data.nodeType} Inspector
               </span>
               <button
                 onClick={() => setSelectedNode(null)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white p-1"
               >
                 ✕
               </button>
@@ -232,22 +258,22 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ graphData, onRef
             <div>
               <h3 className="font-bold text-white text-sm">{selectedNode.data.label}</h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Node ID: {selectedNode.id}
+                {selectedNode.data.sublabel}
               </p>
             </div>
 
-            {selectedNode.data.hasConflict && (
-              <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-900/60 text-rose-300 text-[11px]">
-                <strong className="block font-bold">CONTRADICTION FLAG:</strong>
-                This node is directly engaged in an unresolved quantitative or temporal discrepancy.
+            {selectedNode.data.isOrange && (
+              <div className="p-3 rounded-lg bg-orange-950/50 border border-orange-900/60 text-orange-200 text-[11px] leading-relaxed">
+                <strong className="block font-bold mb-0.5 text-orange-400">Logistical Variance:</strong>
+                This assertion represents a cross-document quantity discrepancy under active audit.
               </div>
             )}
 
-            <div className="space-y-2 pt-2 border-t border-dark-borderSubtle">
+            <div className="space-y-2 pt-2 border-t border-[#22222d]">
               <span className="font-mono text-[10px] uppercase text-slate-400 font-bold block">
-                Extracted Attributes
+                Extracted Data
               </span>
-              <pre className="p-2.5 bg-dark-sidebar text-slate-300 rounded font-mono text-[10px] overflow-x-auto max-h-60 whitespace-pre-wrap border border-dark-cardBorder">
+              <pre className="p-3 bg-[#090a10] text-slate-300 rounded-lg font-mono text-[10px] overflow-x-auto max-h-60 whitespace-pre-wrap border border-[#22222d]">
                 {JSON.stringify(selectedNode.data.payload, null, 2)}
               </pre>
             </div>

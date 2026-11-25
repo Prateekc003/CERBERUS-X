@@ -578,7 +578,9 @@ def get_knowledge_graph(investigation_id: Optional[int] = None, db: Session = De
     ent_q = db.query(models.Entity)
     cnf_q = db.query(models.Conflict)
 
+    inv = None
     if investigation_id:
+        inv = db.query(models.Investigation).filter(models.Investigation.id == investigation_id).first()
         ev_q = ev_q.filter(models.EvidenceFile.investigation_id == investigation_id)
         clm_q = clm_q.filter(models.ExtractedClaim.investigation_id == investigation_id)
         ent_q = ent_q.filter(models.Entity.investigation_id == investigation_id)
@@ -608,7 +610,8 @@ def get_knowledge_graph(investigation_id: Optional[int] = None, db: Session = De
         "severity": cf.severity, "explanation": cf.explanation
     } for cf in cnf_q.all()]
 
-    return build_investigation_knowledge_graph(ev_list, clm_list, ent_list, cnf_list)
+    project_name = inv.title if inv else "Medical Supply Project"
+    return build_investigation_knowledge_graph(ev_list, clm_list, ent_list, cnf_list, project_name=project_name)
 
 @app.get("/api/conflicts", response_model=List[schemas.ConflictResponse])
 def list_conflicts(investigation_id: Optional[int] = None, db: Session = Depends(get_db)):
