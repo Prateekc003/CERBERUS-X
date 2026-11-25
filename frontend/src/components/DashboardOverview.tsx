@@ -260,7 +260,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   ];
 
   return (
-    <div className="min-h-screen flex flex-col justify-between p-6 md:p-8 max-w-6xl mx-auto text-white bg-[#0d0d12]">
+    <div className="min-h-screen flex flex-col justify-between p-6 md:p-8 w-full max-w-[1400px] mx-auto text-white bg-[#0d0d12]">
       {/* Hidden file input for file selection */}
       <input
         type="file"
@@ -420,7 +420,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         {/* Eight Simple Feature Cards in 2 Rows of 4 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 max-w-5xl w-full pt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 max-w-6xl w-full pt-4">
           {cards.map((card) => {
             const Icon = card.icon;
             return (

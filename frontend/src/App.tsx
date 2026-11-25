@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, PanelLeftOpen, PanelLeft, Plus } from 'lucide-react';
 import { api } from './api/client';
 import {
   Investigation,
@@ -20,7 +20,7 @@ import {
 } from './firebase/firestore';
 import { AuthPage } from './components/AuthPage';
 import { AccountInfoModal } from './components/AccountInfoModal';
-import { Navigation, NavTab } from './components/Navigation';
+import { Navigation, NavTab, SidebarMode } from './components/Navigation';
 import { DashboardOverview } from './components/DashboardOverview';
 import { EvidenceUploadCenter } from './components/EvidenceUploadCenter';
 import { EvidenceAnalysis } from './components/EvidenceAnalysis';
@@ -68,6 +68,104 @@ export const App: React.FC = () => {
     const saved = localStorage.getItem('cerberus_theme');
     return saved === 'light' ? 'light' : 'dark';
   });
+
+  // Desktop resizable and collapsible sidebar layout state
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('cerberus_sidebar_width');
+    const num = saved ? parseInt(saved, 10) : 260;
+    return isNaN(num) ? 260 : Math.min(400, Math.max(220, num));
+  });
+
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>(() => {
+    const saved = localStorage.getItem('cerberus_sidebar_mode');
+    if (saved === 'collapsed' || saved === 'hidden' || saved === 'expanded') {
+      return saved as SidebarMode;
+    }
+    return 'expanded';
+  });
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
+
+  // Track responsive screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Save sidebar preferences in localStorage
+  useEffect(() => {
+    localStorage.setItem('cerberus_sidebar_width', String(sidebarWidth));
+    localStorage.setItem('cerberus_sidebar_mode', sidebarMode);
+  }, [sidebarWidth, sidebarMode]);
+
+  // Live sidebar drag-resizing with window listeners
+  const handleStartResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const clientX = e.clientX;
+      if (clientX < 110) {
+        setSidebarMode('hidden');
+      } else if (clientX < 190) {
+        setSidebarMode('collapsed');
+      } else {
+        const clamped = Math.min(400, Math.max(220, clientX));
+        setSidebarWidth(clamped);
+        setSidebarMode('expanded');
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isDragging]);
+
+  // Global keyboard shortcut: Cmd+B / Ctrl+B to toggle sidebar (ChatGPT desktop standard)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setSidebarMode((prev) => (prev === 'expanded' ? 'collapsed' : 'expanded'));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleToggleSidebarMode = useCallback((targetMode?: SidebarMode) => {
+    if (targetMode) {
+      setSidebarMode(targetMode);
+    } else {
+      setSidebarMode((prev) => (prev === 'expanded' ? 'collapsed' : 'expanded'));
+    }
+  }, []);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
@@ -367,8 +465,8 @@ export const App: React.FC = () => {
     'Investigator';
 
   return (
-    <div className="min-h-screen bg-[#0d0d12] flex font-sans text-slate-200 antialiased selection:bg-slate-700 selection:text-white">
-      {/* Sleek Sidebar matching Image */}
+    <div className="min-h-screen bg-[#0d0d12] flex font-sans text-slate-200 antialiased selection:bg-slate-700 selection:text-white relative overflow-x-hidden">
+      {/* Sleek Sidebar with Live Drag Resizing & Responsive Drawer */}
       <Navigation
         activeTab={activeTab}
         onTabChange={(tab) => {
@@ -386,10 +484,71 @@ export const App: React.FC = () => {
           await logout();
           setActiveTab('home');
         }}
+        sidebarWidth={sidebarWidth}
+        sidebarMode={sidebarMode}
+        isDragging={isDragging}
+        onStartResize={handleStartResize}
+        onToggleMode={handleToggleSidebarMode}
+        isMobile={isMobile}
+        isMobileOpen={isMobileOpen}
+        onCloseMobile={() => setIsMobileOpen(false)}
       />
 
-      {/* Main App Content Viewport */}
-      <main className={`flex-1 bg-[#0d0d12] flex flex-col ${activeTab === 'graph' ? 'h-screen overflow-hidden' : 'min-h-screen overflow-y-auto'}`}>
+      {/* Floating Re-Open Sidebar Button when completely hidden (ChatGPT Desktop Style) */}
+      {!isMobile && sidebarMode === 'hidden' && (
+        <div className="fixed top-4 left-4 z-40 animate-in fade-in zoom-in-95 duration-150">
+          <button
+            onClick={() => setSidebarMode('expanded')}
+            className="p-2 rounded-xl bg-[#171717] hover:bg-[#242424] border border-[#303030] text-slate-300 hover:text-white shadow-2xl transition-all flex items-center space-x-2 group"
+            title="Open sidebar (⌘B)"
+          >
+            <PanelLeftOpen className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
+            <span className="text-xs font-medium pr-1 text-slate-300 group-hover:text-white hidden sm:inline">
+              Open sidebar
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Live Resizing Drag Indicator */}
+      {isDragging && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-3.5 py-1.5 bg-[#171717]/95 border border-[#303030] rounded-full text-xs font-mono text-blue-400 shadow-2xl flex items-center space-x-2 backdrop-blur-md animate-in fade-in duration-100 pointer-events-none">
+          <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
+          <span>Sidebar Width: {sidebarWidth}px</span>
+        </div>
+      )}
+
+      {/* Main App Content Viewport - Automatically adjusts whenever sidebar width or mode changes */}
+      <main
+        className={`flex-1 min-w-0 bg-[#0d0d12] flex flex-col ${
+          activeTab === 'graph' ? 'h-screen overflow-hidden' : 'min-h-screen overflow-y-auto'
+        } ${isDragging ? 'transition-none' : 'transition-all duration-200 ease-in-out'}`}
+      >
+        {/* Mobile Header Bar */}
+        {isMobile && (
+          <header className="flex items-center justify-between px-4 py-3 bg-[#171717] border-b border-[#303030] shrink-0 sticky top-0 z-30">
+            <div className="flex items-center space-x-2.5">
+              <button
+                onClick={() => setIsMobileOpen(true)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#262626] transition-colors"
+                title="Open navigation menu"
+              >
+                <PanelLeft className="w-5 h-5" />
+              </button>
+              <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setActiveTab('home')}>
+                <img src="/logo.png" alt="CERBERUS-X" className="w-6 h-6 object-contain rounded-md" />
+                <span className="font-bold text-sm tracking-wider text-white">CERBERUS-X</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsCreatingCase(true)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#262626] transition-colors"
+              title="New Investigation"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </header>
+        )}
         {/* 1. Home Screen (Matches User's Reference Image & 8 Cards Hub) */}
         {activeTab === 'home' && (
           <DashboardOverview
