@@ -16,30 +16,7 @@
   <img src="docs/architecture.png" alt="CERBERUS-X System Architecture" width="100%" />
 </p>
 
-```
-                          ┌────────────────────────────────────────────────────────┐
-                          │            CERBERUS-X ENTERPRISE FRONTEND              │
-                          │   React 19 + TypeScript + Vite + TailwindCSS + Flow   │
-                          └───────────────────────────┬────────────────────────────┘
-                                                      │ REST APIs
-                                                      ▼
-                          ┌────────────────────────────────────────────────────────┐
-                          │              FASTAPI BACKEND SERVICE                   │
-                          │        (Port 8000 | SQLite / PostgreSQL-ready)         │
-                          └──────┬────────────┬─────────────┬─────────────┬────────┘
-                                 │            │             │             │
-                ┌────────────────┘            │             │             └────────────────┐
-                ▼                             ▼             ▼                              ▼
-    ┌──────────────────────┐    ┌─────────────────┐  ┌──────────────┐   ┌──────────────────────────────┐
-    │ MULTIMODAL PARSER    │    │ CONTRADICTION   │  │ KNOWLEDGE    │   │ INVESTIGATION ASSISTANT      │
-    │ PyMuPDF (PDF)        │    │ DETECTION       │  │ GRAPH        │   │ Ollama (Local LLM)           │
-    │ PIL + OCR (Images)   │    │ Quantity/Date   │  │ NetworkX     │   │     OR                       │
-    │ python-docx (DOCX)   │    │ Discrepancies   │  │ React Flow   │   │ Deterministic Fallback       │
-    │ openpyxl (XLSX)      │    │ Status Mismatch │  │ Interactive  │   │ Zero Citation Fabrication    │
-    │ pandas (CSV)         │    │ Cross-Document  │  │ Visualizer   │   └──────────────────────────────┘
-    │ Adversarial Checker  │    └─────────────────┘  └──────────────┘
-    └──────────────────────┘
-```
+
 
 ### Technology Stack:
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, `@xyflow/react` (React Flow), Recharts, Lucide React, Firebase JS SDK v11.
