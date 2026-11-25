@@ -76,6 +76,19 @@ def evaluate_evidence_reliability(
         missing_verification.append("Database changelog or immutable ERP transaction log")
         recommended_actions.append("Corroborate spreadsheet row counts against database ERP exports")
 
+    elif ft in ["sqlite", "db", "sql"]:
+        # Relational database / SQL dump
+        score += 4.0
+        authenticity_indicators.append("Relational database schema with structured table constraints")
+        risk_factors.append("Local SQLite database lacks cryptographic multi-party sign-off")
+        missing_verification.append("Server replication log and transaction commit timestamps")
+
+    elif ft == "json":
+        # Structured JSON dataset
+        score -= 4.0
+        risk_factors.append("JSON datasets are easily modified plain text without built-in digital signatures")
+        missing_verification.append("API cryptographic signature (e.g. HMAC or JWT token)")
+
     elif ft == "docx":
         if meta.get("last_modified_by"):
             authenticity_indicators.append(f"Last modified by identified user: {meta.get('last_modified_by')}")

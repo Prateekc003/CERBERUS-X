@@ -181,14 +181,16 @@ def detect_conflicts_between_claims(claims: List[Dict[str, Any]], evidence_map: 
                             "evidence_b_filename": evB_name,
                             "conflict_type": "QUANTITY_DISCREPANCY",
                             "severity": "HIGH",
-                            "explanation": f"Direct quantitative contradiction on '{actA}': {evA_name} asserts {qA:.0f} {cA.get('quantity_unit', 'units')}, whereas {evB_name} asserts {qB:.0f} (variance: {diff:.0f} units).",
+                            "classification": "Confirmed Conflict",
+                            "explanation": f"Direct quantitative contradiction on '{actA}': {evA_name} asserts {qA:.0f} {cA.get('quantity_unit', 'units')}, whereas {evB_name} asserts {qB:.0f} (variance: {diff:.0f} units). Neither source is automatically assumed correct.",
                             "discrepancy_details": {
                                 "quantity_a": qA,
                                 "quantity_b": qB,
                                 "action_a": actA,
                                 "action_b": actB,
                                 "variance": diff,
-                                "category": "DIRECT_QUANTITY_CONTRADICTION"
+                                "category": "DIRECT_QUANTITY_CONTRADICTION",
+                                "classification": "Confirmed Conflict"
                             },
                             "verification_status": "DETECTED"
                         })
@@ -216,12 +218,14 @@ def detect_conflicts_between_claims(claims: List[Dict[str, Any]], evidence_map: 
                                 "evidence_b_filename": evB_name,
                                 "conflict_type": "QUANTITY_DISCREPANCY",
                                 "severity": "HIGH" if abs(shortfall) > 50 else "MEDIUM",
-                                "explanation": f"In-transit variance detected: Warehouse log ({disp_doc}) records {disp_qty:.0f} dispatched, but physical delivery receipt ({recv_doc}) confirms only {recv_qty:.0f} received (net transit shortfall of {shortfall:.0f} units).",
+                                "classification": "Possible Conflict",
+                                "explanation": f"Stage custody variance: Warehouse dispatch log ({disp_doc}) records {disp_qty:.0f} dispatched, while delivery receipt ({recv_doc}) confirms {recv_qty:.0f} physically received (net transit variance of {shortfall:.0f} units). This may reflect in-transit shrinkage, damaged pallets, or partial shipment rather than false reporting.",
                                 "discrepancy_details": {
                                     "dispatched_quantity": disp_qty,
                                     "received_quantity": recv_qty,
                                     "in_transit_shortfall": shortfall,
-                                    "category": "DISPATCH_RECEIPT_VARIANCE"
+                                    "category": "DISPATCH_RECEIPT_VARIANCE",
+                                    "classification": "Possible Conflict"
                                 },
                                 "verification_status": "DETECTED"
                             })
@@ -249,12 +253,14 @@ def detect_conflicts_between_claims(claims: List[Dict[str, Any]], evidence_map: 
                                 "evidence_b_filename": evB_name,
                                 "conflict_type": "QUANTITY_DISCREPANCY",
                                 "severity": "HIGH",
-                                "explanation": f"Delivery affirmation shortfall: Official oversight report ({deliv_doc}) claims {deliv_qty:.0f} medical kits were delivered, but receiving dock receipt ({recv_doc}) acknowledges receipt of only {recv_qty:.0f} (discrepancy: {unaccounted:.0f} unverified kits).",
+                                "classification": "Confirmed Conflict",
+                                "explanation": f"Delivery affirmation discrepancy: Official executive report ({deliv_doc}) claims {deliv_qty:.0f} medical kits were delivered, but receiving dock slip ({recv_doc}) acknowledges receipt of only {recv_qty:.0f} (shortfall: {unaccounted:.0f} unverified kits). Available evidence is insufficient to verify full 1,000 kit delivery.",
                                 "discrepancy_details": {
                                     "claimed_delivered": deliv_qty,
                                     "actual_received": recv_qty,
                                     "missing_quantity": unaccounted,
-                                    "category": "DELIVERY_AFFIRMATION_SHORTFALL"
+                                    "category": "DELIVERY_AFFIRMATION_SHORTFALL",
+                                    "classification": "Confirmed Conflict"
                                 },
                                 "verification_status": "DETECTED"
                             })
@@ -282,12 +288,14 @@ def detect_conflicts_between_claims(claims: List[Dict[str, Any]], evidence_map: 
                                 "evidence_b_filename": evB_name,
                                 "conflict_type": "QUANTITY_DISCREPANCY",
                                 "severity": "HIGH",
-                                "explanation": f"Post-receipt ledger audit deficit: Physical receiving receipt ({recv_doc}) documents {recv_qty:.0f} received, yet inventory spreadsheet ({rec_doc}) logs only {rec_qty:.0f} recorded in stock ({ledger_gap:.0f} kits missing from inventory records).",
+                                "classification": "Possible Conflict",
+                                "explanation": f"Post-intake ledger variance: Physical intake receipt ({recv_doc}) documents {recv_qty:.0f} received at dock, but inventory audit spreadsheet ({rec_doc}) logs {rec_qty:.0f} entered in stock ({ledger_gap:.0f} kits unlogged). Could represent intake processing delay or internal inventory shrinkage.",
                                 "discrepancy_details": {
                                     "received_quantity": recv_qty,
                                     "recorded_inventory": rec_qty,
                                     "unaccounted_in_ledger": ledger_gap,
-                                    "category": "INVENTORY_LEDGER_DEFICIT"
+                                    "category": "INVENTORY_LEDGER_DEFICIT",
+                                    "classification": "Possible Conflict"
                                 },
                                 "verification_status": "DETECTED"
                             })
@@ -315,12 +323,14 @@ def detect_conflicts_between_claims(claims: List[Dict[str, Any]], evidence_map: 
                                 "evidence_b_filename": evB_name,
                                 "conflict_type": "QUANTITY_DISCREPANCY",
                                 "severity": "HIGH",
-                                "explanation": f"Origin dispatch limitation: Official report ({deliv_doc}) claims {deliv_qty:.0f} were delivered, but warehouse records ({disp_doc}) confirm only {disp_qty:.0f} were dispatched. Delivery of {origin_deficit:.0f} kits is physically impossible based on dispatch records.",
+                                "classification": "Confirmed Conflict",
+                                "explanation": f"Origin dispatch bottleneck: Official summary ({deliv_doc}) asserts {deliv_qty:.0f} were delivered, yet origin warehouse manifest ({disp_doc}) documents only {disp_qty:.0f} were dispatched. Delivery of {origin_deficit:.0f} excess kits is physically impossible from this dispatch.",
                                 "discrepancy_details": {
                                     "claimed_delivered": deliv_qty,
                                     "warehouse_dispatched": disp_qty,
                                     "origin_shortfall": origin_deficit,
-                                    "category": "ORIGIN_DISPATCH_LIMITATION"
+                                    "category": "ORIGIN_DISPATCH_LIMITATION",
+                                    "classification": "Confirmed Conflict"
                                 },
                                 "verification_status": "DETECTED"
                             })
@@ -349,14 +359,46 @@ def detect_conflicts_between_claims(claims: List[Dict[str, Any]], evidence_map: 
                         "evidence_b_filename": evB_name,
                         "conflict_type": "DATE_MISMATCH",
                         "severity": "MEDIUM",
+                        "classification": "Possible Conflict",
                         "explanation": f"Temporal discrepancy: {evA_name} dates the milestone at {dateA}, while {evB_name} dates it at {dateB}.",
                         "discrepancy_details": {
                             "date_a": dateA,
                             "date_b": dateB,
-                            "category": "TEMPORAL_INCONSISTENCY"
+                            "category": "TEMPORAL_INCONSISTENCY",
+                            "classification": "Possible Conflict"
                         },
                         "verification_status": "DETECTED"
                     })
                     conflict_count += 1
+
+            # Compare STATUS claims (e.g. Completed / Full vs Partial / Disputed)
+            statA = cA.get("object_val") if cA.get("claim_type") == "STATUS" else None
+            statB = cB.get("object_val") if cB.get("claim_type") == "STATUS" else None
+            if statA and statB and statA.lower() != statB.lower():
+                evA_name = evidence_map.get(cA["evidence_id"], {}).get("filename", f"Evidence #{cA['evidence_id']}")
+                evB_name = evidence_map.get(cB["evidence_id"], {}).get("filename", f"Evidence #{cB['evidence_id']}")
+                conflicts.append({
+                    "conflict_code": f"CNF-{conflict_count:03d}",
+                    "claim_a_id": cA["id"],
+                    "claim_b_id": cB["id"],
+                    "evidence_a_id": cA["evidence_id"],
+                    "evidence_b_id": cB["evidence_id"],
+                    "claim_a_text": cA["text"],
+                    "claim_b_text": cB["text"],
+                    "evidence_a_filename": evA_name,
+                    "evidence_b_filename": evB_name,
+                    "conflict_type": "STATUS_CONTRADICTION",
+                    "severity": "HIGH",
+                    "classification": "Confirmed Conflict",
+                    "explanation": f"Contradictory execution status: {evA_name} asserts status '{statA}', whereas {evB_name} reports status '{statB}'.",
+                    "discrepancy_details": {
+                        "status_a": statA,
+                        "status_b": statB,
+                        "category": "STATUS_CONTRADICTION",
+                        "classification": "Confirmed Conflict"
+                    },
+                    "verification_status": "DETECTED"
+                })
+                conflict_count += 1
 
     return conflicts

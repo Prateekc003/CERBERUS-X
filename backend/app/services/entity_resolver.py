@@ -25,11 +25,11 @@ def get_spacy_nlp():
                 _SPACY_NLP = None
     return _SPACY_NLP
 
-# Mapping spaCy NER labels to Cerberus-X 7 canonical investigative entity types
+# Mapping spaCy NER labels to Cerberus-X 8 canonical investigative entity types
 SPACY_TO_CANONICAL_TYPE = {
     "PERSON": "PERSON",
-    "ORG": "ORG",
-    "NORP": "ORG",
+    "ORG": "ORGANIZATION",
+    "NORP": "ORGANIZATION",
     "GPE": "LOCATION",
     "LOC": "LOCATION",
     "FAC": "LOCATION",
@@ -40,7 +40,7 @@ SPACY_TO_CANONICAL_TYPE = {
     "LAW": "EVENT",
     "QUANTITY": "QUANTITY",
     "CARDINAL": "QUANTITY",
-    "MONEY": "QUANTITY",
+    "MONEY": "MONEY",
     "PERCENT": "QUANTITY"
 }
 
@@ -80,6 +80,11 @@ QUANTITY_PATTERNS = [
 ]
 
 ABBREVIATION_MAP = {
+    "corp": "corporation",
+    "co": "company",
+    "inc": "incorporated",
+    "ltd": "limited",
+    "llc": "limited liability company",
     "govt": "government",
     "gov": "government",
     "min": "ministry",
@@ -89,6 +94,7 @@ ABBREVIATION_MAP = {
     "whse": "warehouse",
     "fac": "facility",
     "dr.": "",
+    "dr": "",
     "officer": "",
     "inspector": "",
     "director": "",
@@ -118,11 +124,12 @@ def compute_similarity(str1: str, str2: str) -> float:
         return max(jaccard, seq)
     return SequenceMatcher(None, s1, s2).ratio()
 
-def extract_entities_from_text(text: str) -> List[Dict[str, Any]]:
+def extract_entities_from_text(text: str, source_doc: str = "") -> List[Dict[str, Any]]:
     """
     Extracts entities using spaCy Named Entity Recognition (NER) combined with
     specialized domain regex patterns. Supports arbitrary user-uploaded fields,
     names, organizations, geopolitical entities, dates, products, and quantities.
+    Maintains original source references.
     """
     if not text or not text.strip():
         return []
@@ -149,7 +156,8 @@ def extract_entities_from_text(text: str) -> List[Dict[str, Any]]:
                 "normalized_name": norm,
                 "entity_type": etype,
                 "snippet": raw_snippet or cleaned,
-                "extraction_source": source
+                "extraction_source": source,
+                "source_doc": source_doc
             })
 
     # 1. Primary: spaCy Named Entity Recognition (NER) Model

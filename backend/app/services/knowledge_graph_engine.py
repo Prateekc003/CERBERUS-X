@@ -74,16 +74,18 @@ def build_investigation_knowledge_graph(
             }
         )
 
-        # Edge from Document to Claim (BELONGS_TO / CONTAINS)
+        # Edge from Claim to Document (BELONGS_TO)
         doc_node_id = f"doc_{clm['evidence_id']}"
         if G.has_node(doc_node_id):
+            G.add_edge(node_id, doc_node_id, edge_type="BELONGS_TO", label="BELONGS_TO")
             G.add_edge(doc_node_id, node_id, edge_type="CONTAINS", label="CONTAINS")
 
-        # Connect Claim to matching Entities
+        # Connect Claim to matching Entities (MENTIONS)
         for ent in entities_list:
             ent_node_id = f"ent_{ent['id']}"
             if ent["name"].lower() in clm["text"].lower() or ent["normalized_name"] in clm["text"].lower():
                 G.add_edge(node_id, ent_node_id, edge_type="MENTIONS", label="MENTIONS")
+                G.add_edge(doc_node_id, ent_node_id, edge_type="MENTIONS", label="MENTIONS")
 
     # 4. Add Conflict Edges & Nodes (CONTRADICTS)
     for cnf in conflicts_list:
