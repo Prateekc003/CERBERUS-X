@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    background-color: #0d0d12 !important;
+    color: #ffffff !important;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+}
+
+/* Core dark enterprise tokens matching reference image */
+.bg-dark-bg { background-color: #0d0d12 !important; }
+.bg-dark-sidebar { background-color: #131318 !important; }
+.bg-dark-card { background-color: #17171e !important; }
+.bg-dark-cardHover { background-color: #1f1f28 !important; }
+.bg-dark-input { background-color: #16161d !important; }
+.bg-dark-activeNav { background-color: #22222d !important; }
+
+.border-dark-cardBorder { border-color: #23232f !important; }
+.border-dark-borderSubtle { border-color: #1b1b24 !important; }
+
+/* Custom dark scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #0d0d12;
+}
+::-webkit-scrollbar-thumb {
+  background: #23232f;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #333344;
+}
+
+/* React Flow styling in dark mode */
+.react-flow__attribution {
+  display: none !important;
+}
+
+.react-flow__handle {
+  width: 7px !important;
+  height: 7px !important;
+  background: #3b82f6 !important;
+  border: 1.5px solid #17171e !important;
+}

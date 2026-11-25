@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+backend/venv/
+.env
+
+# Node & Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database & Runtime Uploads
+backend/data/cerberus.db
+backend/data/uploads/*
+!backend/data/uploads/.gitkeep
+backend/data/reports/*
+!backend/data/reports/.gitkeep
+
+# System / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
