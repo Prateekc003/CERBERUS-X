@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   UploadCloud,
   File,
@@ -11,16 +11,42 @@ import {
   ShieldAlert,
   Search,
   CheckCircle2,
+  AlertCircle,
+  Loader2,
+  RefreshCw,
+  XCircle,
+  Network,
+  Split,
+  Sparkles,
+  Users
 } from 'lucide-react';
 import { EvidenceFile, Investigation } from '../types';
+import { NavTab } from './Navigation';
 
 interface EvidenceUploadCenterProps {
   evidence: EvidenceFile[];
   currentInvestigation: Investigation | null;
-  onUpload: (files: File[], sourceAttribution?: string) => Promise<void>;
+  onUpload: (
+    files: File[],
+    sourceAttribution?: string,
+    clientId?: string
+  ) => Promise<any>;
   onDelete: (id: number) => Promise<void>;
   onSelectEvidence: (ev: EvidenceFile) => void;
+  onRefreshCase?: () => Promise<void>;
+  onNavigate?: (tab: NavTab) => void;
   loading: boolean;
+}
+
+interface ProcessingStageEvent {
+  stage: string;
+  stage_index: number;
+  total_stages: number;
+  percentage: number;
+  message: string;
+  current_file?: string;
+  file_index?: number;
+  total_files?: number;
 }
 
 export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
@@ -29,6 +55,8 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
   onUpload,
   onDelete,
   onSelectEvidence,
+  onRefreshCase,
+  onNavigate,
   loading,
 }) => {
   const [dragActive, setDragActive] = useState(false);
@@ -38,7 +66,25 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
   const [typeFilter, setTypeFilter] = useState('ALL');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Real-time processing state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStage, setProcessingStage] = useState<ProcessingStageEvent | null>(null);
+  const [successNotice, setSuccessNotice] = useState<{ message: string; filesCount: number } | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const activeClientIdRef = useRef<string | null>(null);
+
   const allowedExtensions = ['.pdf', '.docx', '.txt', '.jpg', '.jpeg', '.png', '.csv', '.xlsx', '.json', '.sql', '.sqlite', '.db'];
+  const maxFileSizeBytes = 50 * 1024 * 1024; // 50MB
+
+  // Cleanup websocket on unmount
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -59,19 +105,118 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
     }
   };
 
-  const handleFiles = (files: File[]) => {
-    const valid = files.filter((f) => {
+  const handleFiles = (incomingFiles: File[]) => {
+    setErrorMessage(null);
+    setSuccessNotice(null);
+
+    const validFiles: File[] = [];
+    for (const f of incomingFiles) {
       const ext = '.' + f.name.split('.').pop()?.toLowerCase();
-      return allowedExtensions.includes(ext);
-    });
-    setSelectedFiles((prev) => [...prev, ...valid]);
+      if (!allowedExtensions.includes(ext)) {
+        setErrorMessage(`File '${f.name}' has an unsupported format. Supported formats: PDF, DOCX, XLSX, CSV, PNG, JPG, TXT, JSON.`);
+        continue;
+      }
+      if (f.size > maxFileSizeBytes) {
+        setErrorMessage(`File '${f.name}' exceeds the maximum allowed size of 50 MB.`);
+        continue;
+      }
+      if (f.size === 0) {
+        setErrorMessage(`File '${f.name}' is empty (0 bytes).`);
+        continue;
+      }
+      // Check duplicate in current staging list
+      if (!selectedFiles.some((sf) => sf.name === f.name && sf.size === f.size)) {
+        validFiles.push(f);
+      }
+    }
+
+    if (validFiles.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...validFiles]);
+    }
+  };
+
+  const cancelCurrentProcessing = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send('CANCEL');
+    }
+    if (activeClientIdRef.current) {
+      fetch(`/api/evidence/upload/cancel/${activeClientIdRef.current}`, { method: 'POST' }).catch(() => {});
+    }
+    setIsProcessing(false);
+    setProcessingStage(null);
+    setErrorMessage('Evidence processing cancelled by investigator.');
   };
 
   const submitUpload = async () => {
-    if (selectedFiles.length === 0) return;
-    await onUpload(selectedFiles, sourceAttribution);
-    setSelectedFiles([]);
-    setSourceAttribution('');
+    if (selectedFiles.length === 0 || !currentInvestigation) return;
+
+    setErrorMessage(null);
+    setSuccessNotice(null);
+    setIsProcessing(true);
+
+    const clientId = 'proc_' + Math.random().toString(36).substring(2, 10);
+    activeClientIdRef.current = clientId;
+
+    // Connect WebSocket for live 10-stage real-time progress
+    try {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/ws/processing/${clientId}`;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'STAGE_UPDATE') {
+            setProcessingStage({
+              stage: data.stage,
+              stage_index: data.stage_index,
+              total_stages: data.total_stages,
+              percentage: data.percentage,
+              message: data.message,
+              current_file: data.current_file,
+              file_index: data.file_index,
+              total_files: data.total_files,
+            });
+          }
+        } catch {
+          // Non-blocking parse error
+        }
+      };
+
+      ws.onerror = () => {
+        // Fallback to HTTP status if websocket is blocked
+      };
+    } catch {
+      // Non-blocking
+    }
+
+    try {
+      const fileCount = selectedFiles.length;
+      await onUpload(selectedFiles, sourceAttribution, clientId);
+      
+      setSelectedFiles([]);
+      setSourceAttribution('');
+      setIsProcessing(false);
+      setProcessingStage(null);
+      setSuccessNotice({
+        message: 'Evidence processed successfully. Analysis results have been saved.',
+        filesCount: fileCount,
+      });
+
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    } catch (err: any) {
+      setIsProcessing(false);
+      setProcessingStage(null);
+      setErrorMessage(err.message || 'Evidence ingestion failed.');
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    }
   };
 
   const removeStagedFile = (idx: number) => {
@@ -103,14 +248,14 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto text-slate-200">
-      {/* Header */}
+      {/* Header with Case Code and Sync */}
       <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-[#22222d] gap-4">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">
             Evidence Repository
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Uploaded documents, receipts, and datasets for case{' '}
+            Automated temporary ingestion pipeline for case{' '}
             <strong className="text-blue-400 font-mono">[{currentInvestigation?.case_code || 'CASE'}]</strong>.
           </p>
         </div>
@@ -122,13 +267,131 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>SHA-256 Verified</span>
           </span>
+          {onRefreshCase && (
+            <button
+              onClick={onRefreshCase}
+              disabled={loading || isProcessing}
+              title="Reopen saved investigation results without uploading again"
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-[#1c1c24] border border-[#2e2e3a] text-slate-300 hover:text-white transition-colors"
+            >
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+              <span className="text-[11px]">Reopen Saved Results</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Success Notification Banner */}
+      {successNotice && (
+        <div className="p-4 bg-emerald-950/40 border border-emerald-900/60 rounded-xl space-y-2 text-xs animate-in fade-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-emerald-300 font-semibold">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{successNotice.message}</span>
+            </div>
+            <button
+              onClick={() => setSuccessNotice(null)}
+              className="text-emerald-400 hover:text-white text-sm"
+            >
+              ×
+            </button>
+          </div>
+          <p className="text-[11.5px] text-slate-300">
+            {successNotice.filesCount} file(s) processed. Original temporary files were securely purged from disk and memory.
+            All claims, entities, conflicts, and knowledge graph structures have been stored in the database.
+          </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-[11px] text-slate-400 font-medium">Quick Links:</span>
+            {onNavigate && (
+              <>
+                <button
+                  onClick={() => onNavigate('graph')}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-[#162a22] text-emerald-300 border border-emerald-800 text-[11px] hover:bg-emerald-900/50 transition-colors"
+                >
+                  <Network className="w-3 h-3" />
+                  <span>View Knowledge Graph</span>
+                </button>
+                <button
+                  onClick={() => onNavigate('conflicts')}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-[#162a22] text-emerald-300 border border-emerald-800 text-[11px] hover:bg-emerald-900/50 transition-colors"
+                >
+                  <Split className="w-3 h-3" />
+                  <span>View Detected Conflicts</span>
+                </button>
+                <button
+                  onClick={() => onNavigate('entities')}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-[#162a22] text-emerald-300 border border-emerald-800 text-[11px] hover:bg-emerald-900/50 transition-colors"
+                >
+                  <Users className="w-3 h-3" />
+                  <span>View Entity Resolution</span>
+                </button>
+                <button
+                  onClick={() => onNavigate('reliability')}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-[#162a22] text-emerald-300 border border-emerald-800 text-[11px] hover:bg-emerald-900/50 transition-colors"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>View Reliability Scores</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {errorMessage && (
+        <div className="p-3.5 bg-rose-950/40 border border-rose-900/60 rounded-xl text-xs flex items-center justify-between text-rose-300">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="text-rose-400 hover:text-white text-base ml-2"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Real-time Processing HUD (10 Meaningful Pipeline Stages) */}
+      {isProcessing && (
+        <div className="bg-[#14141e] border border-blue-500/40 rounded-xl p-5 shadow-lg space-y-3 animate-in fade-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+              <span className="font-semibold text-xs text-white uppercase tracking-wider font-mono">
+                Pipeline Stage [{processingStage?.stage_index || 1}/10]: {processingStage?.stage || 'PROCESSING'}
+              </span>
+            </div>
+            <button
+              onClick={cancelCurrentProcessing}
+              className="flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] bg-red-950/50 text-red-300 border border-red-900/60 hover:bg-red-900/60 transition-colors"
+            >
+              <XCircle className="w-3 h-3" />
+              <span>Cancel Processing</span>
+            </button>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full bg-[#20202c] rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-blue-600 to-sky-400 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${processingStage?.percentage || 10}%` }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+            <span>{processingStage?.message || 'Processing uploaded evidence through intelligence engines...'}</span>
+            <span>{processingStage?.percentage || 10}%</span>
+          </div>
+        </div>
+      )}
 
       {/* Upload Dropzone */}
       <div className="bg-[#14141b] border border-[#23232f] rounded-xl p-5 shadow-sm space-y-4">
         <h2 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-medium">
-          Upload Evidence
+          Upload Evidence (Temporary Processing Pipeline)
         </h2>
 
         <div
@@ -153,10 +416,13 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
           />
           <UploadCloud className="w-8 h-8 text-slate-300 mx-auto mb-2" />
           <p className="text-xs font-semibold text-white">
-            Click to upload or drag & drop files here
+            Click to upload or drag & drop evidence files here
           </p>
           <p className="text-[11px] text-slate-400 mt-1 font-mono">
-            PDF, TXT, Images, Excel, CSV, JSON, SQLite (Max 50MB per file)
+            PDF, DOCX, XLSX, CSV, Images, TXT, JSON (Max 50MB per file)
+          </p>
+          <p className="text-[10px] text-sky-400 font-mono mt-1">
+            🔒 Files are temporarily processed for entity & conflict analysis and securely purged afterwards.
           </p>
         </div>
 
@@ -166,13 +432,13 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex-1">
                 <label className="text-[11px] font-mono text-slate-400 uppercase block mb-1">
-                  Source / Custody (Optional)
+                  Source Attribution / Custody (Optional)
                 </label>
                 <input
                   type="text"
                   value={sourceAttribution}
                   onChange={(e) => setSourceAttribution(e.target.value)}
-                  placeholder="e.g. Ministry Archive, Dock Intake Slip, Warehouse Manifest"
+                  placeholder="e.g. Ministry Official, Receiving Dock Manifest, Inventory Log"
                   className="w-full text-xs bg-[#0e0e14] border border-[#2a2a38] text-white rounded-lg px-3 py-2 focus:outline-none focus:border-slate-500"
                 />
               </div>
@@ -180,16 +446,18 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
               <div className="flex items-center space-x-2 pt-4 sm:pt-0">
                 <button
                   onClick={() => setSelectedFiles([])}
-                  className="text-xs px-3 py-2 rounded-lg border border-[#2a2a38] text-slate-300 hover:bg-[#1f1f2a]"
+                  disabled={isProcessing}
+                  className="text-xs px-3 py-2 rounded-lg border border-[#2a2a38] text-slate-300 hover:bg-[#1f1f2a] disabled:opacity-50"
                 >
                   Clear All
                 </button>
                 <button
                   onClick={submitUpload}
-                  disabled={loading}
-                  className="text-xs font-semibold px-4 py-2 rounded-lg bg-white text-black hover:bg-slate-200 transition-colors disabled:opacity-50"
+                  disabled={loading || isProcessing}
+                  className="text-xs font-semibold px-4 py-2 rounded-lg bg-white text-black hover:bg-slate-200 transition-colors disabled:opacity-50 flex items-center space-x-1.5"
                 >
-                  <span>{loading ? 'Uploading...' : `Upload & Process (${selectedFiles.length})`}</span>
+                  {isProcessing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isProcessing ? 'Processing Pipeline...' : `Upload & Process (${selectedFiles.length})`}</span>
                 </button>
               </div>
             </div>
@@ -200,7 +468,7 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
                   key={idx}
                   className="flex items-center space-x-2 bg-[#0e0e14] border border-[#282836] px-2.5 py-1 rounded text-xs"
                 >
-                  <File className="w-3.5 h-3.5 text-slate-400" />
+                  {getFileIcon(file.name.split('.').pop() || '')}
                   <span className="font-mono text-slate-200 truncate max-w-[200px]">{file.name}</span>
                   <span className="text-[10px] text-slate-500 font-mono">
                     ({(file.size / 1024).toFixed(1)} KB)
@@ -210,6 +478,7 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
                       e.stopPropagation();
                       removeStagedFile(idx);
                     }}
+                    disabled={isProcessing}
                     className="text-slate-400 hover:text-red-400 ml-1"
                   >
                     ×
@@ -227,7 +496,7 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
         <div className="p-4 border-b border-[#22222d] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#101017]">
           <div className="flex items-center space-x-2">
             <span className="text-xs font-mono font-medium uppercase text-slate-300">
-              Evidence Files ({filteredEvidence.length})
+              Analyzed Evidence Files ({filteredEvidence.length})
             </span>
           </div>
 
@@ -271,11 +540,11 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
               <thead>
                 <tr className="border-b border-[#22222d] text-slate-400 font-mono text-[11px] uppercase bg-[#101017]/50">
                   <th className="py-2.5 px-4 font-medium">Code</th>
-                  <th className="py-2.5 px-4 font-medium">File</th>
-                  <th className="py-2.5 px-4 font-medium">Source</th>
-                  <th className="py-2.5 px-4 font-medium">Claims</th>
+                  <th className="py-2.5 px-4 font-medium">File Name</th>
+                  <th className="py-2.5 px-4 font-medium">Source Attribution</th>
+                  <th className="py-2.5 px-4 font-medium">Extracted Claims</th>
                   <th className="py-2.5 px-4 font-medium">Reliability</th>
-                  <th className="py-2.5 px-4 font-medium">Security</th>
+                  <th className="py-2.5 px-4 font-medium">Integrity Check</th>
                   <th className="py-2.5 px-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
@@ -334,7 +603,7 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
                       {ev.adversarial_flagged ? (
                         <span className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-900/60">
                           <ShieldAlert className="w-3 h-3 text-rose-400" />
-                          <span>Review</span>
+                          <span>Flagged</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-900/60">
@@ -346,16 +615,18 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
 
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end space-x-2">
+                        {/* Inspect Extracted Information Modal (No raw file download/preview) */}
                         <button
                           onClick={() => onSelectEvidence(ev)}
-                          title="Inspect Document"
-                          className="p-1.5 rounded hover:bg-[#20202c] text-slate-400 hover:text-white transition-colors"
+                          title="View Extracted Claims & Intelligence"
+                          className="flex items-center space-x-1 px-2.5 py-1 rounded bg-[#1f1f2b] border border-[#2f2f3e] hover:bg-[#272738] text-slate-300 hover:text-white transition-colors text-[11px]"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Inspect Claims</span>
                         </button>
                         <button
                           onClick={() => onDelete(ev.id)}
-                          title="Delete Evidence"
+                          title="Delete Evidence Record"
                           className="p-1.5 rounded hover:bg-rose-950/40 text-slate-500 hover:text-rose-400 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />

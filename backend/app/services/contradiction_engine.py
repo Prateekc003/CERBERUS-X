@@ -288,6 +288,74 @@ def detect_conflicts_between_claims(claims: List[Dict[str, Any]], evidence_map: 
                         })
                         conflict_count += 1
 
+            # Compare DATE claims across documents
+            elif cA.get("claim_type") == "DATE" and cB.get("claim_type") == "DATE":
+                dateA = cA.get("date_val")
+                dateB = cB.get("date_val")
+                if dateA and dateB and dateA != dateB:
+                    pair_key = ("DATE", min(dateA, dateB), max(dateA, dateB))
+                    if pair_key not in seen_semantic_pairs:
+                        seen_semantic_pairs.add(pair_key)
+                        evA_name = evidence_map.get(cA["evidence_id"], {}).get("filename", f"Evidence #{cA['evidence_id']}")
+                        evB_name = evidence_map.get(cB["evidence_id"], {}).get("filename", f"Evidence #{cB['evidence_id']}")
+                        conflicts.append({
+                            "conflict_code": f"CNF-{conflict_count:03d}",
+                            "claim_a_id": cA["id"],
+                            "claim_b_id": cB["id"],
+                            "evidence_a_id": cA["evidence_id"],
+                            "evidence_b_id": cB["evidence_id"],
+                            "claim_a_text": cA["text"],
+                            "claim_b_text": cB["text"],
+                            "evidence_a_filename": evA_name,
+                            "evidence_b_filename": evB_name,
+                            "conflict_type": "DATE_MISMATCH",
+                            "severity": "MEDIUM",
+                            "classification": "Possible Conflict",
+                            "explanation": f"Inconsistent milestone dates reported across sources: '{dateA}' vs '{dateB}'. Requires audit log timestamp verification.",
+                            "discrepancy_details": {
+                                "date_a": dateA,
+                                "date_b": dateB,
+                                "category": "DATE_DISCREPANCY",
+                                "classification": "Possible Conflict"
+                            },
+                            "verification_status": "DETECTED"
+                        })
+                        conflict_count += 1
+
+            # Compare LOCATION claims across documents
+            elif cA.get("location_val") and cB.get("location_val"):
+                locA = cA.get("location_val").strip().lower()
+                locB = cB.get("location_val").strip().lower()
+                if locA and locB and locA != locB:
+                    pair_key = ("LOCATION", min(locA, locB), max(locA, locB))
+                    if pair_key not in seen_semantic_pairs:
+                        seen_semantic_pairs.add(pair_key)
+                        evA_name = evidence_map.get(cA["evidence_id"], {}).get("filename", f"Evidence #{cA['evidence_id']}")
+                        evB_name = evidence_map.get(cB["evidence_id"], {}).get("filename", f"Evidence #{cB['evidence_id']}")
+                        conflicts.append({
+                            "conflict_code": f"CNF-{conflict_count:03d}",
+                            "claim_a_id": cA["id"],
+                            "claim_b_id": cB["id"],
+                            "evidence_a_id": cA["evidence_id"],
+                            "evidence_b_id": cB["evidence_id"],
+                            "claim_a_text": cA["text"],
+                            "claim_b_text": cB["text"],
+                            "evidence_a_filename": evA_name,
+                            "evidence_b_filename": evB_name,
+                            "conflict_type": "LOCATION_CONFLICT",
+                            "severity": "MEDIUM",
+                            "classification": "Possible Conflict",
+                            "explanation": f"Conflicting delivery or destination locations cited: '{cA.get('location_val')}' vs '{cB.get('location_val')}'.",
+                            "discrepancy_details": {
+                                "location_a": cA.get("location_val"),
+                                "location_b": cB.get("location_val"),
+                                "category": "LOCATION_MISMATCH",
+                                "classification": "Possible Conflict"
+                            },
+                            "verification_status": "DETECTED"
+                        })
+                        conflict_count += 1
+
     return conflicts
 
 extract_structured_claims = extract_structured_claims_from_text

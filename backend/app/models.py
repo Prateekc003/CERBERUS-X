@@ -25,6 +25,7 @@ class Investigation(Base):
     case_code = Column(String(64), unique=True, index=True, nullable=False)
     status = Column(String(50), default="ACTIVE")  # ACTIVE, UNDER_REVIEW, CLOSED, ARCHIVED
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    owner_id = Column(String(128), index=True, nullable=True)  # Firebase userId
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -43,13 +44,13 @@ class EvidenceFile(Base):
     investigation_id = Column(Integer, ForeignKey("investigations.id"), nullable=False, index=True)
     evidence_code = Column(String(64), unique=True, index=True, nullable=False) # e.g. EVD-2026-001
     filename = Column(String(255), nullable=False)
-    file_path = Column(String(512), nullable=False)
+    file_path = Column(String(512), nullable=True, default="")  # Temporary only, purged after processing
     file_type = Column(String(32), nullable=False) # pdf, docx, xlsx, etc.
     file_size_bytes = Column(Integer, nullable=False)
     sha256_hash = Column(String(64), nullable=False)
     mime_type = Column(String(128), nullable=True)
     uploaded_at = Column(DateTime, default=datetime.datetime.utcnow)
-    status = Column(String(50), default="PENDING") # PENDING, PROCESSING, EXTRACTED, FAILED
+    status = Column(String(50), default="PENDING") # PENDING, PROCESSING, EXTRACTED, COMPLETED, FAILED
     source_attribution = Column(String(255), nullable=True) # e.g. Ministry Official, Receiving Dock, etc.
     metadata_json = Column(Text, nullable=True) # JSON document metadata
     extracted_text = Column(Text, nullable=True) # full text
@@ -94,9 +95,10 @@ class Entity(Base):
     investigation_id = Column(Integer, ForeignKey("investigations.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False, index=True)
     normalized_name = Column(String(255), nullable=False, index=True)
-    entity_type = Column(String(64), nullable=False) # PERSON, ORG, LOCATION, DATE, EVENT, PRODUCT, QUANTITY
+    entity_type = Column(String(64), nullable=False) # PERSON, ORG, LOCATION, DATE, EVENT, PRODUCT, QUANTITY, MONEY
     mention_count = Column(Integer, default=1)
     alias_of_id = Column(Integer, ForeignKey("entities.id"), nullable=True)
+    review_status = Column(String(32), default="PENDING_REVIEW") # PENDING_REVIEW, VERIFIED, RESOLVED
     metadata_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -132,6 +134,7 @@ class Conflict(Base):
     evidence_b_id = Column(Integer, ForeignKey("evidence_files.id"), nullable=False)
     conflict_type = Column(String(64), nullable=False) # QUANTITY_DISCREPANCY, DATE_MISMATCH, STATUS_CONTRADICTION, ATTRIBUTION_CONFLICT, LOCATION_CONFLICT, SEMANTIC_CONTRADICTION
     severity = Column(String(32), default="HIGH") # HIGH, MEDIUM, LOW
+    classification = Column(String(64), default="CONFIRMED CONFLICT") # CONFIRMED CONFLICT, POSSIBLE CONFLICT, NO CONFLICT, INSUFFICIENT EVIDENCE
     explanation = Column(Text, nullable=False)
     discrepancy_details = Column(Text, nullable=True) # JSON with breakdown
     verification_status = Column(String(50), default="DETECTED") # DETECTED, UNDER_REVIEW, VERIFIED_CONFLICT, RESOLVED_EXPLAINED, DISMISSED
@@ -189,3 +192,28 @@ class InvestigationReport(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     investigation = relationship("Investigation", back_populates="reports")
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    investigation_id = Column(Integer, ForeignKey("investigations.id"), nullable=True, index=True)
+    user_id = Column(String(128), nullable=True, index=True)
+    action = Column(String(100), nullable=False) # EVIDENCE_UPLOAD, CONTRADICTION_DETECTED, TEMPORARY_PURGED, SYNC
+    details_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class AIAssistantAnswer(Base):
+    __tablename__ = "ai_assistant_answers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    investigation_id = Column(Integer, ForeignKey("investigations.id"), nullable=False, index=True)
+    user_id = Column(String(128), nullable=True, index=True)
+    query = Column(Text, nullable=False)
+    answer = Column(Text, nullable=False)
+    reasoning_mode = Column(String(64), nullable=False)
+    is_sufficient = Column(Boolean, default=True)
+    confidence = Column(Float, default=1.0)
+    citations_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+

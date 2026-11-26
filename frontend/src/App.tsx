@@ -17,6 +17,8 @@ import { useAuth } from './context/AuthContext';
 import {
   saveInvestigationToFirestore,
   getUserInvestigationsFromFirestore,
+  saveAnalysisBundleToFirestore,
+  saveAIAssistantAnswerToFirestore,
 } from './firebase/firestore';
 import { AuthPage } from './components/AuthPage';
 import { AccountInfoModal } from './components/AccountInfoModal';
@@ -341,16 +343,39 @@ export const App: React.FC = () => {
     }
   };
 
-  // Evidence upload
-  const handleUploadEvidence = async (files: File[], sourceAttribution?: string) => {
+  // Evidence upload with temporary processing & Firestore sync
+  const handleUploadEvidence = async (
+    files: File[],
+    sourceAttribution?: string,
+    clientId?: string
+  ) => {
     if (!currentInvestigation) return;
     setLoading(true);
     try {
-      await api.uploadEvidence(currentInvestigation.id, files, sourceAttribution);
+      const res = await api.uploadEvidence(
+        currentInvestigation.id,
+        files,
+        sourceAttribution,
+        clientId,
+        user?.uid
+      );
       await refreshCaseData();
+
+      // Sync bundle to Firestore for persistent cloud record
+      if (user && currentInvestigation) {
+        try {
+          const bundle = await api.getAnalysisBundle(currentInvestigation.id);
+          await saveAnalysisBundleToFirestore(user.uid, currentInvestigation.id, bundle);
+        } catch (fsErr) {
+          console.warn('Firestore sync warning (offline or network mode):', fsErr);
+        }
+      }
+
+      return res;
     } catch (err: any) {
       console.error('Upload error:', err);
       setErrorNotification(err.message || 'Evidence ingestion failed.');
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -409,10 +434,21 @@ export const App: React.FC = () => {
     }
   };
 
-  // Assistant query
+  // Assistant query with Firestore persistence
   const handleQueryAssistant = async (query: string, mode?: string) => {
     if (!currentInvestigation) throw new Error('No active case selected');
-    return await api.queryAssistant(currentInvestigation.id, query, mode);
+    const response = await api.queryAssistant(currentInvestigation.id, query, mode);
+    if (user && currentInvestigation && response) {
+      saveAIAssistantAnswerToFirestore(user.uid, currentInvestigation.id, {
+        query,
+        answer: response.answer,
+        reasoningMode: response.reasoning_mode || mode || 'hybrid',
+        citations: response.citations || [],
+        isSufficient: (response as any).is_sufficient ?? (response as any).is_sufficient_evidence ?? true,
+        confidenceScore: response.confidence_score ?? 1.0,
+      }).catch((err) => console.warn('Firestore ai_answer sync warning:', err));
+    }
+    return response;
   };
 
   // Report generation
@@ -593,6 +629,8 @@ export const App: React.FC = () => {
             onUpload={handleUploadEvidence}
             onDelete={handleDeleteEvidence}
             onSelectEvidence={handleInspectEvidence}
+            onRefreshCase={refreshCaseData}
+            onNavigate={(tab) => setActiveTab(tab)}
             loading={loading}
           />
         )}

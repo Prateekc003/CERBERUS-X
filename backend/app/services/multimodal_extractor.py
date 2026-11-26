@@ -31,10 +31,25 @@ def extract_pdf(file_path: str) -> Dict[str, Any]:
     }
 
     full_text_parts = []
+    ocr_applied = False
     for page_idx in range(len(doc)):
         page = doc[page_idx]
         text = page.get_text("text")
         page_num = page_idx + 1
+
+        # Handle scanned PDFs through OCR fallback
+        if not text.strip() or len(text.strip()) < 15:
+            try:
+                import pytesseract
+                pix = page.get_pixmap(dpi=150)
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                ocr_result = pytesseract.image_to_string(img)
+                if ocr_result and len(ocr_result.strip()) > 10:
+                    text = ocr_result.strip()
+                    ocr_applied = True
+            except Exception:
+                pass
+
         pages_text.append({
             "page_number": page_num,
             "text": text
@@ -49,7 +64,7 @@ def extract_pdf(file_path: str) -> Dict[str, Any]:
                     "record_id": f"REC-PDF-P{page_num}-{p_idx:02d}",
                     "page_or_sheet": f"Page {page_num}",
                     "content": clean_para,
-                    "method": "PyMuPDF"
+                    "method": "PyMuPDF (OCR Fallback)" if ocr_applied else "PyMuPDF"
                 })
 
     full_text = "\n\n".join(full_text_parts)
@@ -60,8 +75,8 @@ def extract_pdf(file_path: str) -> Dict[str, Any]:
         "metadata": metadata,
         "pages": pages_text,
         "records": records,
-        "ocr_applied": False,
-        "method": "PyMuPDF"
+        "ocr_applied": ocr_applied,
+        "method": "PyMuPDF (with OCR fallback)" if ocr_applied else "PyMuPDF"
     }
 
 def extract_docx(file_path: str) -> Dict[str, Any]:

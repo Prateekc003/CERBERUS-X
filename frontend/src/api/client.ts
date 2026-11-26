@@ -69,24 +69,58 @@ export const api = {
     return res.json();
   },
 
-  uploadEvidence: async (investigationId: number, files: File[], sourceAttribution?: string) => {
+  uploadEvidence: async (
+    investigationId: number,
+    files: File[],
+    sourceAttribution?: string,
+    clientId?: string,
+    userId?: string
+  ) => {
     const formData = new FormData();
     formData.append('investigation_id', investigationId.toString());
     if (sourceAttribution) {
       formData.append('source_attribution', sourceAttribution);
     }
+    if (clientId) {
+      formData.append('client_id', clientId);
+    }
     for (const file of files) {
       formData.append('files', file);
     }
 
+    const headers: Record<string, string> = {};
+    if (userId) {
+      headers['X-User-ID'] = userId;
+    }
+
     const res = await fetch(`${BASE_URL}/evidence/upload`, {
       method: 'POST',
+      headers,
       body: formData,
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Upload failed' }));
       throw new Error(err.detail || 'Upload failed');
     }
+    return res.json();
+  },
+
+  cancelUpload: async (clientId: string) => {
+    const res = await fetch(`${BASE_URL}/evidence/upload/cancel/${clientId}`, {
+      method: 'POST',
+    });
+    return res.json();
+  },
+
+  getAnalysisBundle: async (investigationId: number) => {
+    const res = await fetch(`${BASE_URL}/investigations/${investigationId}/analysis-bundle`);
+    if (!res.ok) throw new Error('Failed to fetch investigation analysis bundle');
+    return res.json();
+  },
+
+  getAuditLogs: async (investigationId: number) => {
+    const res = await fetch(`${BASE_URL}/investigations/${investigationId}/audit-logs`);
+    if (!res.ok) throw new Error('Failed to fetch audit logs');
     return res.json();
   },
 

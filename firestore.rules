@@ -29,17 +29,53 @@ service cloud.firestore {
     }
 
     // Investigations collection:
-    // Users can ONLY read, create, update, or delete their own investigations.
+    // Users can ONLY access their own investigations.
     match /investigations/{investigationId} {
-      allow read: if request.auth != null
-                  && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null
-                    && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null
-                    && resource.data.userId == request.auth.uid
-                    && request.resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null
-                    && resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || resource.data.ownerId == request.auth.uid);
+      allow create: if request.auth != null && (request.resource.data.userId == request.auth.uid || request.resource.data.ownerId == request.auth.uid);
+      allow update, delete: if request.auth != null && (resource.data.userId == request.auth.uid || resource.data.ownerId == request.auth.uid);
+    }
+
+    // Evidence Metadata collection:
+    // Stores only metadata (filename, hash, processing status, sizes) - NO original binaries.
+    match /evidence_metadata/{fileId} {
+      allow read, write: if request.auth != null && (request.resource.data.userId == request.auth.uid || resource.data.userId == request.auth.uid);
+    }
+
+    // Entities collection:
+    // Discovered and resolved entities for the case.
+    match /entities/{entityId} {
+      allow read, write: if request.auth != null && (request.resource.data.userId == request.auth.uid || resource.data.userId == request.auth.uid);
+    }
+
+    // Knowledge Graphs collection:
+    // NetworkX graph nodes and edge topologies.
+    match /knowledge_graphs/{graphId} {
+      allow read, write: if request.auth != null && (request.resource.data.userId == request.auth.uid || resource.data.userId == request.auth.uid);
+    }
+
+    // Conflicts collection:
+    // Detected evidence contradictions, variances, and review statuses.
+    match /conflicts/{conflictId} {
+      allow read, write: if request.auth != null && (request.resource.data.userId == request.auth.uid || resource.data.userId == request.auth.uid);
+    }
+
+    // Reliability Scores collection:
+    // Objective provenance scoring and explainable factors.
+    match /reliability_scores/{scoreId} {
+      allow read, write: if request.auth != null && (request.resource.data.userId == request.auth.uid || resource.data.userId == request.auth.uid);
+    }
+
+    // AI Answers collection:
+    // Grounded citations and assistant reasoning history.
+    match /ai_answers/{answerId} {
+      allow read, write: if request.auth != null && (request.resource.data.userId == request.auth.uid || resource.data.userId == request.auth.uid);
+    }
+
+    // Audit Logs collection:
+    // Processing events, temporary file purge confirmations, and session actions.
+    match /audit_logs/{logId} {
+      allow read, write: if request.auth != null && (request.resource.data.userId == request.auth.uid || resource.data.userId == request.auth.uid);
     }
 
     // Deny all other collections by default

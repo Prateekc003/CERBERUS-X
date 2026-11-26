@@ -237,3 +237,211 @@ export async function getUserInvestigationsFromFirestore(
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((d) => d.data() as FirestoreInvestigation);
 }
+
+/**
+ * Persist the entire investigation analysis bundle to Cloud Firestore.
+ * Conforms to the structured data model:
+ * - investigations/
+ * - evidence_metadata/
+ * - entities/
+ * - knowledge_graphs/
+ * - conflicts/
+ * - reliability_scores/
+ * - audit_logs/
+ *
+ * NOTE: Original evidence files are NEVER uploaded or saved to Firestore.
+ */
+export async function saveAnalysisBundleToFirestore(
+  userId: string,
+  investigationId: number | string,
+  bundle: any
+): Promise<void> {
+  if (!db || !userId) return;
+
+  const invStr = String(investigationId);
+
+  // 1. Update investigation document
+  try {
+    const invRef = doc(db, 'investigations', `${userId}_${invStr}`);
+    await setDoc(invRef, {
+      investigationId: invStr,
+      userId,
+      ownerId: userId,
+      title: bundle.investigation?.title || 'Investigation',
+      description: bundle.investigation?.description || '',
+      caseCode: bundle.investigation?.case_code || `INV-${invStr}`,
+      status: bundle.investigation?.status || 'ACTIVE',
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Firestore investigations sync warning:', err);
+  }
+
+  // 2. Save Evidence Metadata (NO binary files)
+  if (Array.isArray(bundle.evidence_metadata)) {
+    for (const ev of bundle.evidence_metadata) {
+      try {
+        const evRef = doc(db, 'evidence_metadata', `${userId}_${invStr}_${ev.id || ev.evidence_code}`);
+        await setDoc(evRef, {
+          fileId: String(ev.id || ev.evidence_code),
+          investigationId: invStr,
+          userId,
+          filename: ev.filename,
+          fileType: ev.file_type,
+          fileSize: ev.file_size_bytes || 0,
+          uploadedAt: ev.uploaded_at || new Date().toISOString(),
+          processingStatus: ev.status || 'COMPLETED',
+          sha256Hash: ev.sha256_hash || '',
+          sourceAttribution: ev.source_attribution || '',
+          ocrApplied: Boolean(ev.ocr_applied),
+          adversarialFlagged: Boolean(ev.adversarial_flagged),
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Firestore evidence_metadata sync warning:', err);
+      }
+    }
+  }
+
+  // 3. Save Entities
+  if (Array.isArray(bundle.entities)) {
+    for (const ent of bundle.entities) {
+      try {
+        const entRef = doc(db, 'entities', `${userId}_${invStr}_${ent.id || ent.normalized_name}`);
+        await setDoc(entRef, {
+          entityId: String(ent.id || ent.normalized_name),
+          investigationId: invStr,
+          userId,
+          name: ent.name,
+          normalizedName: ent.normalized_name,
+          entityType: ent.entity_type,
+          mentionCount: ent.mention_count || 1,
+          reviewStatus: ent.review_status || 'PENDING_REVIEW',
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Firestore entities sync warning:', err);
+      }
+    }
+  }
+
+  // 4. Save Knowledge Graph
+  if (bundle.knowledge_graph) {
+    try {
+      const graphRef = doc(db, 'knowledge_graphs', `${userId}_${invStr}`);
+      await setDoc(graphRef, {
+        graphId: `${userId}_${invStr}`,
+        investigationId: invStr,
+        userId,
+        nodes: bundle.knowledge_graph.nodes || [],
+        edges: bundle.knowledge_graph.edges || [],
+        stats: bundle.knowledge_graph.stats || {},
+        generatedAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Firestore knowledge_graphs sync warning:', err);
+    }
+  }
+
+  // 5. Save Conflicts
+  if (Array.isArray(bundle.conflicts)) {
+    for (const conf of bundle.conflicts) {
+      try {
+        const confRef = doc(db, 'conflicts', `${userId}_${invStr}_${conf.id || conf.conflict_code}`);
+        await setDoc(confRef, {
+          conflictId: String(conf.id || conf.conflict_code),
+          investigationId: invStr,
+          userId,
+          conflictCode: conf.conflict_code,
+          conflictType: conf.conflict_type,
+          severity: conf.severity,
+          classification: conf.classification || 'Confirmed Conflict',
+          explanation: conf.explanation,
+          discrepancyDetails: conf.discrepancy_details || {},
+          verificationStatus: conf.verification_status || 'DETECTED',
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Firestore conflicts sync warning:', err);
+      }
+    }
+  }
+
+  // 6. Save Reliability Scores
+  if (Array.isArray(bundle.reliability)) {
+    for (const rel of bundle.reliability) {
+      try {
+        const relRef = doc(db, 'reliability_scores', `${userId}_${invStr}_${rel.evidence_id || rel.filename}`);
+        await setDoc(relRef, {
+          scoreId: String(rel.evidence_id || rel.filename),
+          investigationId: invStr,
+          userId,
+          fileId: String(rel.evidence_id || ''),
+          filename: rel.filename || '',
+          score: rel.score,
+          category: rel.category,
+          provenanceNotes: rel.provenance_notes || '',
+          authenticityIndicators: rel.authenticity_indicators || [],
+          riskFactors: rel.risk_factors || [],
+          missingVerification: rel.missing_verification || [],
+          recommendedActions: rel.recommended_actions || [],
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Firestore reliability_scores sync warning:', err);
+      }
+    }
+  }
+
+  // 7. Save Audit Log
+  try {
+    const logRef = doc(db, 'audit_logs', `${userId}_${invStr}_${Date.now()}`);
+    await setDoc(logRef, {
+      logId: `${userId}_${invStr}_${Date.now()}`,
+      investigationId: invStr,
+      userId,
+      action: 'EVIDENCE_PROCESSED_TEMPORARY_PURGED',
+      details: {
+        timestamp: new Date().toISOString(),
+        filesCount: bundle.evidence_metadata?.length || 0,
+        temporaryPurged: true,
+      },
+      createdAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn('Firestore audit_logs sync warning:', err);
+  }
+}
+
+/**
+ * Record an AI Assistant answer in Firestore `ai_answers` collection.
+ */
+export async function saveAIAssistantAnswerToFirestore(
+  userId: string,
+  investigationId: number | string,
+  answerData: {
+    query: string;
+    answer: string;
+    reasoningMode: string;
+    citations?: any[];
+    isSufficient?: boolean;
+    confidenceScore?: number;
+  }
+): Promise<void> {
+  if (!db || !userId) return;
+  try {
+    const invStr = String(investigationId);
+    const ansRef = doc(db, 'ai_answers', `${userId}_${invStr}_${Date.now()}`);
+    await setDoc(ansRef, {
+      answerId: `${userId}_${invStr}_${Date.now()}`,
+      investigationId: invStr,
+      userId,
+      query: answerData.query,
+      answer: answerData.answer,
+      reasoningMode: answerData.reasoningMode,
+      citations: answerData.citations || [],
+      isSufficient: answerData.isSufficient ?? true,
+      confidenceScore: answerData.confidenceScore ?? 1.0,
+      createdAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn('Firestore ai_answers sync warning:', err);
+  }
+}
+

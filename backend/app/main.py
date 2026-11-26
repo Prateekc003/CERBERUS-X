@@ -6,11 +6,12 @@ import datetime
 from typing import List, Optional
 from pathlib import Path
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Query, WebSocket, WebSocketDisconnect, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import jwt
 
 from app.config import UPLOAD_DIR, REPORT_DIR, OLLAMA_HOST, OLLAMA_MODEL
 from app.database import engine, get_db, Base
@@ -22,6 +23,11 @@ from app.services.reliability_engine import evaluate_evidence_reliability
 from app.services.knowledge_graph_engine import build_investigation_knowledge_graph
 from app.services.investigation_assistant import query_investigation_assistant, check_ollama_available, get_active_ollama_model
 from app.services.report_generator import build_investigation_markdown_and_data, generate_pdf_report
+from app.services.temporary_pipeline import (
+    ws_manager,
+    process_evidence_batch_temporarily,
+    cleanup_abandoned_temp_dirs
+)
 from app.seed_scenario import seed_medical_supply_investigation
 
 # Create DB tables
@@ -45,6 +51,7 @@ app.add_middleware(
 # Seed demonstration scenario automatically if database is fresh
 @app.on_event("startup")
 def on_startup():
+    cleanup_abandoned_temp_dirs()
     db = next(get_db())
     try:
         count = db.query(models.Investigation).count()
@@ -54,6 +61,43 @@ def on_startup():
         print(f"Startup seed notice: {e}")
     finally:
         db.close()
+
+def get_current_user_id(
+    authorization: Optional[str] = Header(None),
+    x_user_id: Optional[str] = Header(None)
+) -> Optional[str]:
+    """Extracts authenticated user ID from Firebase Bearer token or X-User-ID header."""
+    if x_user_id:
+        return x_user_id
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        try:
+            payload = jwt.decode(token, options={"verify_signature": False})
+            return payload.get("user_id") or payload.get("sub") or payload.get("uid")
+        except Exception:
+            pass
+    return None
+
+# ----------------- REAL-TIME WEBSOCKET PROCESSING -----------------
+@app.websocket("/api/ws/processing/{client_id}")
+async def websocket_processing_endpoint(websocket: WebSocket, client_id: str):
+    await ws_manager.connect(client_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "CANCEL":
+                ws_manager.cancel(client_id)
+                await ws_manager.broadcast_stage(client_id, "COMPLETED", "Processing cancelled by investigator.")
+    except WebSocketDisconnect:
+        ws_manager.disconnect(client_id)
+    except Exception:
+        ws_manager.disconnect(client_id)
+
+@app.post("/api/evidence/upload/cancel/{client_id}")
+def cancel_upload_processing(client_id: str):
+    ws_manager.cancel(client_id)
+    return {"message": f"Processing for session '{client_id}' cancelled."}
+
 
 # ----------------- SYSTEM & DASHBOARD APIs -----------------
 @app.get("/api/system/status")
@@ -303,112 +347,42 @@ def get_evidence_detail(evidence_id: int, db: Session = Depends(get_db)):
 async def upload_evidence(
     investigation_id: int = Form(...),
     source_attribution: Optional[str] = Form(None),
+    client_id: Optional[str] = Form(None),
     files: List[UploadFile] = File(...),
+    authorization: Optional[str] = Header(None),
+    x_user_id: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
+    user_id = get_current_user_id(authorization, x_user_id)
+    return await process_evidence_batch_temporarily(
+        investigation_id=investigation_id,
+        files=files,
+        db=db,
+        source_attribution=source_attribution,
+        client_id=client_id,
+        user_id=user_id
+    )
+
+@app.get("/api/investigations/{investigation_id}/analysis-bundle")
+def get_investigation_analysis_bundle(investigation_id: int, db: Session = Depends(get_db)):
+    """
+    Returns the complete structured evidentiary analysis bundle for the case.
+    Enables users to reopen past investigations and review all results without
+    requiring original files to be stored.
+    """
     inv = db.query(models.Investigation).filter(models.Investigation.id == investigation_id).first()
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
 
-    saved_evidence = []
-    
-    # Calculate globally unique evidence code counter
-    max_ev_id = db.query(func.max(models.EvidenceFile.id)).scalar() or 0
-    total_ev = db.query(models.EvidenceFile).count()
-    counter = max(max_ev_id, total_ev)
+    evidence_files = db.query(models.EvidenceFile).filter(models.EvidenceFile.investigation_id == investigation_id).all()
+    claims = db.query(models.ExtractedClaim).filter(models.ExtractedClaim.investigation_id == investigation_id).all()
+    entities = db.query(models.Entity).filter(models.Entity.investigation_id == investigation_id).all()
+    conflicts = db.query(models.Conflict).filter(models.Conflict.investigation_id == investigation_id).all()
+    reliability = db.query(models.ReliabilityAssessment).filter(models.ReliabilityAssessment.investigation_id == investigation_id).all()
+    audit_logs = db.query(models.AuditLog).filter(models.AuditLog.investigation_id == investigation_id).order_by(models.AuditLog.created_at.desc()).all()
 
-    for f in files:
-        contents = await f.read()
-        sha256 = hashlib.sha256(contents).hexdigest()
-        ext = Path(f.filename).suffix.lower()
-        file_type = ext.replace(".", "") or "unknown"
-        
-        # Save file to upload directory
-        dest_path = UPLOAD_DIR / f"{sha256[:12]}_{f.filename}"
-        with open(dest_path, "wb") as dest:
-            dest.write(contents)
+    ev_map = {e.id: {"filename": e.filename, "evidence_code": e.evidence_code} for e in evidence_files}
 
-        # Generate unique non-colliding evidence_code
-        counter += 1
-        ev_code = f"EVD-{datetime.datetime.utcnow().year}-{counter:04d}"
-        while db.query(models.EvidenceFile).filter(models.EvidenceFile.evidence_code == ev_code).first():
-            counter += 1
-            ev_code = f"EVD-{datetime.datetime.utcnow().year}-{counter:04d}"
-
-        # Run extraction
-        extraction = process_file_multimodal(str(dest_path), f.filename)
-
-        ev = models.EvidenceFile(
-            investigation_id=investigation_id,
-            evidence_code=ev_code,
-            filename=f.filename,
-            file_path=str(dest_path),
-            file_type=file_type,
-            file_size_bytes=len(contents),
-            sha256_hash=sha256,
-            mime_type=f.content_type,
-            status="EXTRACTED",
-            source_attribution=source_attribution or "Uploaded Evidence",
-            metadata_json=json.dumps(extraction.get("metadata", {})),
-            extracted_text=extraction.get("text", ""),
-            ocr_applied=extraction.get("ocr_applied", False),
-            adversarial_flagged=extraction.get("adversarial_flagged", False),
-            adversarial_report_json=json.dumps(extraction.get("adversarial_report", {}))
-        )
-        db.add(ev)
-        db.commit()
-        db.refresh(ev)
-
-        # Extract claims
-        claims_data = extract_structured_claims(extraction.get("text", ""), f.filename, extraction.get("metadata"))
-        for c in claims_data:
-            c_obj = models.ExtractedClaim(
-                investigation_id=investigation_id,
-                evidence_id=ev.id,
-                claim_code=f"{ev_code}-{c['claim_code']}",
-                text=c["text"],
-                claim_type=c["claim_type"],
-                subject=c.get("subject"),
-                predicate=c.get("predicate"),
-                object_val=c.get("object_val"),
-                quantity_val=c.get("quantity_val"),
-                quantity_unit=c.get("quantity_unit"),
-                quantity_action=c.get("quantity_action"),
-                date_val=c.get("date_val"),
-                location_val=c.get("location_val"),
-                page_or_location=c.get("page_or_location"),
-                confidence=c.get("confidence", 1.0),
-                raw_snippet=c.get("raw_snippet")
-            )
-            db.add(c_obj)
-
-        # Extract entities using spaCy
-        ents = extract_entities_from_text(extraction.get("text", ""), source_doc=f.filename)
-        for ent in ents:
-            norm = ent["normalized_name"]
-            existing_ent = db.query(models.Entity).filter(
-                models.Entity.investigation_id == investigation_id,
-                models.Entity.normalized_name == norm
-            ).first()
-            if existing_ent:
-                existing_ent.mention_count += 1
-            else:
-                new_ent = models.Entity(
-                    investigation_id=investigation_id,
-                    name=ent["name"],
-                    normalized_name=norm,
-                    entity_type=ent["entity_type"],
-                    mention_count=1
-                )
-                db.add(new_ent)
-        db.commit()
-        saved_evidence.append({"id": ev.id, "filename": ev.filename, "evidence_code": ev.evidence_code})
-
-    # Run conflict re-evaluation once across all investigation evidence
-    all_inv_claims = db.query(models.ExtractedClaim).filter(models.ExtractedClaim.investigation_id == investigation_id).all()
-    all_inv_ev = db.query(models.EvidenceFile).filter(models.EvidenceFile.investigation_id == investigation_id).all()
-    ev_map = {e.id: {"filename": e.filename, "evidence_code": e.evidence_code} for e in all_inv_ev}
-    
     claims_dict_list = [{
         "id": c.id,
         "evidence_id": c.evidence_id,
@@ -424,59 +398,110 @@ async def upload_evidence(
         "date_val": c.date_val,
         "location_val": c.location_val,
         "page_or_location": c.page_or_location
-    } for c in all_inv_claims]
+    } for c in claims]
 
-    conflicts = detect_conflicts_between_claims(claims_dict_list, ev_map)
-    
-    # Clear existing auto conflicts and recreate
-    db.query(models.Conflict).filter(models.Conflict.investigation_id == investigation_id).delete()
-    for cf in conflicts:
-        cnf_obj = models.Conflict(
-            investigation_id=investigation_id,
-            conflict_code=cf["conflict_code"],
-            claim_a_id=cf["claim_a_id"],
-            claim_b_id=cf["claim_b_id"],
-            evidence_a_id=cf["evidence_a_id"],
-            evidence_b_id=cf["evidence_b_id"],
-            conflict_type=cf["conflict_type"],
-            severity=cf["severity"],
-            explanation=cf["explanation"],
-            discrepancy_details=json.dumps(cf.get("discrepancy_details", {})),
-            verification_status="DETECTED"
-        )
-        db.add(cnf_obj)
-    db.commit()
+    conflicts_dict_list = [{
+        "id": cf.id,
+        "conflict_code": cf.conflict_code,
+        "claim_a_id": cf.claim_a_id,
+        "claim_b_id": cf.claim_b_id,
+        "evidence_a_id": cf.evidence_a_id,
+        "evidence_b_id": cf.evidence_b_id,
+        "conflict_type": cf.conflict_type,
+        "severity": cf.severity,
+        "classification": cf.classification,
+        "explanation": cf.explanation,
+        "discrepancy_details": json.loads(cf.discrepancy_details or "{}") if isinstance(cf.discrepancy_details, str) else cf.discrepancy_details,
+        "verification_status": cf.verification_status
+    } for cf in conflicts]
 
-    # Compute reliability scores for each file
-    for e in all_inv_ev:
-        e_confs = [c for c in conflicts if c["evidence_a_id"] == e.id or c["evidence_b_id"] == e.id]
-        meta = json.loads(e.metadata_json) if e.metadata_json else {}
-        adv = json.loads(e.adversarial_report_json) if e.adversarial_report_json else {}
-        rel_res = evaluate_evidence_reliability(
-            evidence_meta=meta,
-            file_type=e.file_type,
-            extracted_text=e.extracted_text or "",
-            adversarial_report=adv,
-            has_conflicts=len(e_confs) > 0,
-            conflicts_count=len(e_confs),
-            is_corroborated=False
-        )
-        rel_rec = db.query(models.ReliabilityAssessment).filter(models.ReliabilityAssessment.evidence_id == e.id).first()
-        if not rel_rec:
-            rel_rec = models.ReliabilityAssessment(investigation_id=investigation_id, evidence_id=e.id, score=rel_res["score"], category=rel_res["category"])
-            db.add(rel_rec)
-        rel_rec.score = rel_res["score"]
-        rel_rec.category = rel_res["category"]
-        rel_rec.provenance_notes = rel_res["provenance_notes"]
-        rel_rec.authenticity_indicators_json = json.dumps(rel_res["authenticity_indicators"])
-        rel_rec.risk_factors_json = json.dumps(rel_res["risk_factors"])
-        rel_rec.missing_verification_json = json.dumps(rel_res["missing_verification"])
-        rel_rec.recommended_actions_json = json.dumps(rel_res["recommended_actions"])
-    db.commit()
+    graph_data = build_investigation_knowledge_graph(
+        evidence_list=[{"id": e.id, "filename": e.filename, "evidence_code": e.evidence_code, "file_type": e.file_type} for e in evidence_files],
+        claims_list=claims_dict_list,
+        entities_list=[{"id": e.id, "name": e.name, "entity_type": e.entity_type} for e in entities],
+        conflicts_list=conflicts_dict_list,
+        project_name=inv.title
+    )
 
-    return {"message": f"Successfully processed {len(saved_evidence)} evidence file(s)", "evidence": saved_evidence}
+    return {
+        "investigation": {
+            "id": inv.id,
+            "title": inv.title,
+            "description": inv.description,
+            "case_code": inv.case_code,
+            "status": inv.status,
+            "owner_id": inv.owner_id,
+            "created_at": inv.created_at,
+            "updated_at": inv.updated_at
+        },
+        "evidence_metadata": [
+            {
+                "id": e.id,
+                "evidence_code": e.evidence_code,
+                "filename": e.filename,
+                "file_type": e.file_type,
+                "file_size_bytes": e.file_size_bytes,
+                "sha256_hash": e.sha256_hash,
+                "uploaded_at": e.uploaded_at,
+                "status": e.status,
+                "source_attribution": e.source_attribution,
+                "ocr_applied": e.ocr_applied,
+                "adversarial_flagged": e.adversarial_flagged
+            }
+            for e in evidence_files
+        ],
+        "claims": claims_dict_list,
+        "entities": [
+            {
+                "id": ent.id,
+                "name": ent.name,
+                "normalized_name": ent.normalized_name,
+                "entity_type": ent.entity_type,
+                "mention_count": ent.mention_count,
+                "review_status": getattr(ent, "review_status", "PENDING_REVIEW")
+            }
+            for ent in entities
+        ],
+        "conflicts": conflicts_dict_list,
+        "reliability": [
+            {
+                "evidence_id": r.evidence_id,
+                "filename": ev_map.get(r.evidence_id, {}).get("filename"),
+                "score": r.score,
+                "category": r.category,
+                "provenance_notes": r.provenance_notes,
+                "authenticity_indicators": json.loads(r.authenticity_indicators_json or "[]"),
+                "risk_factors": json.loads(r.risk_factors_json or "[]"),
+                "missing_verification": json.loads(r.missing_verification_json or "[]"),
+                "recommended_actions": json.loads(r.recommended_actions_json or "[]")
+            }
+            for r in reliability
+        ],
+        "knowledge_graph": graph_data,
+        "audit_logs": [
+            {
+                "id": a.id,
+                "action": a.action,
+                "details": json.loads(a.details_json or "{}") if isinstance(a.details_json, str) else a.details_json,
+                "created_at": a.created_at
+            }
+            for a in audit_logs
+        ]
+    }
 
-    return {"message": f"Successfully processed {len(saved_evidence)} evidence file(s)", "evidence": saved_evidence}
+@app.get("/api/investigations/{investigation_id}/audit-logs")
+def get_investigation_audit_logs(investigation_id: int, db: Session = Depends(get_db)):
+    logs = db.query(models.AuditLog).filter(models.AuditLog.investigation_id == investigation_id).order_by(models.AuditLog.created_at.desc()).all()
+    return [
+        {
+            "id": a.id,
+            "action": a.action,
+            "user_id": a.user_id,
+            "details": json.loads(a.details_json or "{}") if isinstance(a.details_json, str) else a.details_json,
+            "created_at": a.created_at
+        }
+        for a in logs
+    ]
 
 @app.delete("/api/evidence/{evidence_id}")
 def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
@@ -486,9 +511,10 @@ def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
     
     # Delete file from disk if exists
     try:
-        p = Path(ev.file_path)
-        if p.exists():
-            p.unlink()
+        if ev.file_path:
+            p = Path(ev.file_path)
+            if p.exists():
+                p.unlink()
     except Exception:
         pass
 
