@@ -74,7 +74,25 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
   const wsRef = useRef<WebSocket | null>(null);
   const activeClientIdRef = useRef<string | null>(null);
 
-  const allowedExtensions = ['.pdf', '.docx', '.txt', '.jpg', '.jpeg', '.png', '.csv', '.xlsx', '.json', '.sql', '.sqlite', '.db'];
+  const allowedExtensions = [
+    '.pdf',
+    '.docx',
+    '.doc',
+    '.txt',
+    '.md',
+    '.markdown',
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.csv',
+    '.xlsx',
+    '.xls',
+    '.json',
+    '.sql',
+    '.sqlite',
+    '.db',
+  ];
   const maxFileSizeBytes = 50 * 1024 * 1024; // 50MB
 
   // Cleanup websocket on unmount
@@ -148,7 +166,7 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
   };
 
   const submitUpload = async () => {
-    if (selectedFiles.length === 0 || !currentInvestigation) return;
+    if (selectedFiles.length === 0) return;
 
     setErrorMessage(null);
     setSuccessNotice(null);
@@ -158,6 +176,7 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
     activeClientIdRef.current = clientId;
 
     // Connect WebSocket for live 10-stage real-time progress
+    let wsReceivedUpdate = false;
     try {
       const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '');
       let wsUrl: string;
@@ -176,6 +195,7 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'STAGE_UPDATE') {
+            wsReceivedUpdate = true;
             setProcessingStage({
               stage: data.stage,
               stage_index: data.stage_index,
@@ -193,16 +213,46 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
       };
 
       ws.onerror = () => {
-        // Fallback to HTTP status if websocket is blocked
+        // Fallback to client-side timer simulation if websocket is unavailable
       };
     } catch {
       // Non-blocking
     }
 
+    // Fallback simulation timer if WebSocket is blocked or offline
+    const STAGES = [
+      { stage: 'UPLOADING', message: `Staging ${selectedFiles.length} file(s)...`, pct: 15 },
+      { stage: 'EXTRACTING', message: 'Extracting multimodal text and data structures...', pct: 30 },
+      { stage: 'ENTITY IDENTIFICATION', message: 'Detecting persons, organizations, and quantities...', pct: 45 },
+      { stage: 'ENTITY RESOLUTION', message: 'Resolving and indexing entities across files...', pct: 60 },
+      { stage: 'KNOWLEDGE GRAPH GENERATION', message: 'Constructing evidentiary graph topology...', pct: 70 },
+      { stage: 'CONFLICT DETECTION', message: 'Cross-examining statements for discrepancies...', pct: 80 },
+      { stage: 'RELIABILITY SCORING', message: 'Evaluating source provenance and authenticity...', pct: 90 },
+      { stage: 'SAVING RESULTS', message: 'Persisting analysis metadata...', pct: 98 },
+    ];
+    let simIdx = 0;
+    const simTimer = setInterval(() => {
+      if (!wsReceivedUpdate && simIdx < STAGES.length) {
+        const s = STAGES[simIdx];
+        setProcessingStage({
+          stage: s.stage,
+          stage_index: simIdx + 1,
+          total_stages: 10,
+          percentage: s.pct,
+          message: s.message,
+        });
+        simIdx++;
+      }
+    }, 400);
+
     try {
       const fileCount = selectedFiles.length;
       await onUpload(selectedFiles, sourceAttribution, clientId);
+      if (onRefreshCase) {
+        await onRefreshCase();
+      }
       
+      clearInterval(simTimer);
       setSelectedFiles([]);
       setSourceAttribution('');
       setIsProcessing(false);
@@ -217,6 +267,7 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
         wsRef.current = null;
       }
     } catch (err: any) {
+      clearInterval(simTimer);
       setIsProcessing(false);
       setProcessingStage(null);
       setErrorMessage(err.message || 'Evidence ingestion failed.');
@@ -418,7 +469,7 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.csv,.xlsx,.json,.sql,.sqlite,.db"
+            accept=".pdf,.docx,.doc,.txt,.md,.markdown,.jpg,.jpeg,.png,.webp,.csv,.xlsx,.xls,.json,.sql,.sqlite,.db"
             onChange={(e) => e.target.files && handleFiles(Array.from(e.target.files))}
             className="hidden"
           />

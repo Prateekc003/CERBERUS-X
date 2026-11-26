@@ -241,11 +241,11 @@ export const App: React.FC = () => {
   }, [user, loadInitialData]);
 
   // Fetch all data for the active investigation
-  const refreshCaseData = useCallback(async () => {
-    if (!currentInvestigation || !user) return;
+  const refreshCaseData = useCallback(async (overrideInvId?: number) => {
+    const invId = overrideInvId || currentInvestigation?.id;
+    if (!invId || !user) return;
     setLoading(true);
     try {
-      const invId = currentInvestigation.id;
       const [evList, clmList, entList, cnfList, relList, gData, dData, repList] = await Promise.all([
         api.getEvidenceList(invId),
         api.getClaims(invId),
@@ -268,9 +268,9 @@ export const App: React.FC = () => {
 
       // Sync evidence references to Firestore investigation doc
       saveInvestigationToFirestore(user.uid, {
-        investigationId: String(currentInvestigation.id),
-        investigationName: currentInvestigation.title,
-        investigationStatus: currentInvestigation.status,
+        investigationId: String(invId),
+        investigationName: currentInvestigation?.title || `Investigation ${invId}`,
+        investigationStatus: currentInvestigation?.status || 'ACTIVE',
         uploadedEvidenceReferences: evList.map(
           (e) => `${e.evidence_code}:${e.filename}`
         ),
@@ -396,7 +396,7 @@ export const App: React.FC = () => {
         clientId,
         user?.uid
       );
-      await refreshCaseData();
+      await refreshCaseData(targetInv.id);
 
       // Sync bundle to Firestore for persistent cloud record
       if (user && targetInv) {
