@@ -779,6 +779,44 @@ def generate_report(payload: schemas.ReportGenerateRequest, db: Session = Depend
         "created_at": rep.created_at
     }
 
+@app.get("/api/reports/{report_id}", response_model=schemas.ReportResponse)
+def get_report(report_id: int, db: Session = Depends(get_db)):
+    rep = db.query(models.InvestigationReport).filter(models.InvestigationReport.id == report_id).first()
+    if not rep:
+        raise HTTPException(status_code=404, detail="Report not found")
+    findings = json.loads(rep.findings_json) if rep.findings_json else {}
+    return {
+        "id": rep.id,
+        "report_code": rep.report_code,
+        "title": rep.title,
+        "executive_summary": rep.executive_summary,
+        "findings": findings,
+        "report_markdown": rep.report_markdown,
+        "pdf_download_url": f"/api/reports/{rep.id}/pdf",
+        "created_at": rep.created_at
+    }
+
+@app.get("/api/reports", response_model=List[schemas.ReportResponse])
+def list_reports(investigation_id: Optional[int] = None, db: Session = Depends(get_db)):
+    q = db.query(models.InvestigationReport)
+    if investigation_id:
+        q = q.filter(models.InvestigationReport.investigation_id == investigation_id)
+    reps = q.order_by(models.InvestigationReport.created_at.desc()).all()
+    results = []
+    for rep in reps:
+        findings = json.loads(rep.findings_json) if rep.findings_json else {}
+        results.append({
+            "id": rep.id,
+            "report_code": rep.report_code,
+            "title": rep.title,
+            "executive_summary": rep.executive_summary,
+            "findings": findings,
+            "report_markdown": rep.report_markdown,
+            "pdf_download_url": f"/api/reports/{rep.id}/pdf",
+            "created_at": rep.created_at
+        })
+    return results
+
 @app.get("/api/reports/{report_id}/pdf")
 def download_pdf_report(report_id: int, db: Session = Depends(get_db)):
     rep = db.query(models.InvestigationReport).filter(models.InvestigationReport.id == report_id).first()

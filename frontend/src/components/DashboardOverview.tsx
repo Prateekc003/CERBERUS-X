@@ -227,48 +227,56 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const cards = [
     {
       id: 'upload',
+      tab: 'repository',
       title: 'Upload Evidence',
       description: 'PDF, images, tables, datasets and more',
       icon: Upload,
     },
     {
       id: 'analyse',
+      tab: 'analysis',
       title: 'Analyse Evidence',
       description: 'Extract and understand key information',
       icon: Search,
     },
     {
       id: 'graph',
+      tab: 'graph',
       title: 'Build Knowledge Graph',
       description: 'Connect evidence, people, events and claims',
       icon: Share2,
     },
     {
       id: 'conflicts',
+      tab: 'conflicts',
       title: 'Detect Conflicts',
       description: 'Find contradictory or mismatching claims',
       icon: ArrowRightLeft,
     },
     {
       id: 'reliability',
+      tab: 'reliability',
       title: 'Reliability Scoring',
       description: 'Evaluate source trustworthiness',
       icon: ShieldCheck,
     },
     {
       id: 'entities',
+      tab: 'entities',
       title: 'Entity Resolution',
       description: 'Identify and merge same entities',
       icon: Users,
     },
     {
       id: 'reasoning',
+      tab: 'assistant',
       title: 'Evidence Reasoning',
       description: 'Get AI-based, evidence-grounded answers',
       icon: FileCheck,
     },
     {
       id: 'report',
+      tab: 'reports',
       title: 'Generate Report',
       description: 'Create a complete investigation report',
       icon: BarChart2,
@@ -442,12 +450,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             return (
               <div
                 key={card.id}
-                className="bg-[#17171e] border border-[#23232f] p-5 rounded-2xl flex flex-col items-center text-center cursor-default select-none transition-all shadow-sm min-h-[125px] justify-center"
+                onClick={() => onNavigate(card.tab)}
+                className="bg-[#17171e] border border-[#23232f] hover:border-slate-500 hover:bg-[#1e1e27] hover:scale-[1.02] active:scale-[0.98] p-5 rounded-2xl flex flex-col items-center text-center cursor-pointer select-none transition-all shadow-sm min-h-[125px] justify-center group"
+                title={`Open ${card.title}`}
               >
-                <div className="w-8 h-8 flex items-center justify-center text-white mb-2">
+                <div className="w-8 h-8 flex items-center justify-center text-white mb-2 group-hover:scale-110 transition-transform">
                   <Icon className="w-5 h-5 stroke-[1.5] text-white" />
                 </div>
-                <h3 className="text-xs font-bold text-white tracking-tight">
+                <h3 className="text-xs font-bold text-white tracking-tight group-hover:text-blue-400 transition-colors">
                   {card.title}
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-1 leading-snug line-clamp-2 max-w-[190px]">

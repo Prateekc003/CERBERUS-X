@@ -214,7 +214,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
-  const userEmailDisplay = user?.email || 'mohammedfaisal90876@gmail.com';
+  const userEmailDisplay = user?.email || userProfile?.email || 'investigator@cerberus-x.local';
 
   return (
     <div className="min-h-full py-8 px-4 flex justify-center">

@@ -246,7 +246,7 @@ export const App: React.FC = () => {
     setLoading(true);
     try {
       const invId = currentInvestigation.id;
-      const [evList, clmList, entList, cnfList, relList, gData, dData] = await Promise.all([
+      const [evList, clmList, entList, cnfList, relList, gData, dData, repList] = await Promise.all([
         api.getEvidenceList(invId),
         api.getClaims(invId),
         api.getEntities(invId),
@@ -254,6 +254,7 @@ export const App: React.FC = () => {
         api.getReliability(invId),
         api.getKnowledgeGraph(invId),
         api.getDashboardOverview(invId),
+        api.getReports(invId).catch(() => []),
       ]);
 
       setEvidence(evList);
@@ -263,6 +264,7 @@ export const App: React.FC = () => {
       setReliability(relList);
       setGraphData(gData);
       setDashboardData(dData);
+      setReportData(repList && repList.length > 0 ? repList[0] : null);
 
       // Sync evidence references to Firestore investigation doc
       saveInvestigationToFirestore(user.uid, {

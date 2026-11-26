@@ -221,6 +221,15 @@ export const api = {
   },
 
   // Reports
+  getReports: async (investigationId?: number): Promise<ReportData[]> => {
+    const url = investigationId
+      ? `${BASE_URL}/reports?investigation_id=${investigationId}`
+      : `${BASE_URL}/reports`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch reports');
+    return res.json();
+  },
+
   generateReport: async (investigationId: number, title?: string): Promise<ReportData> => {
     const res = await fetch(`${BASE_URL}/reports/generate`, {
       method: 'POST',

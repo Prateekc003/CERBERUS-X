@@ -17,9 +17,11 @@ export const ReportDossier: React.FC<ReportDossierProps> = ({
 }) => {
   const handleDownloadPdf = () => {
     if (reportData?.pdf_download_url) {
-      const url = reportData.pdf_download_url.startsWith('http')
-        ? reportData.pdf_download_url
-        : `http://127.0.0.1:8000${reportData.pdf_download_url}`;
+      const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '');
+      let url = reportData.pdf_download_url;
+      if (!url.startsWith('http')) {
+        url = apiUrl ? `${apiUrl}${url}` : url;
+      }
       window.open(url, '_blank');
     }
   };
