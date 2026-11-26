@@ -23,6 +23,7 @@ import {
   User as UserIcon,
   Settings,
   LogOut,
+  Loader2,
 } from 'lucide-react';
 import { DashboardOverview as DashboardData, Investigation } from '../types';
 
@@ -59,6 +60,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 }) => {
   const [promptInput, setPromptInput] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,7 +90,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   // Valid supported extensions for CERBERUS-X
   const VALID_EXTENSIONS = [
     '.pdf',
+    '.docx',
+    '.doc',
     '.txt',
+    '.md',
+    '.markdown',
     '.jpg',
     '.jpeg',
     '.png',
@@ -104,7 +110,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   const isValidFile = (file: File) => {
     const name = file.name.toLowerCase();
-    if (name.startsWith('.') || name === 'thumbs.db') return false;
+    if (name.startsWith('.') || name === 'thumbs.db' || name === 'desktop.ini') return false;
     return VALID_EXTENSIONS.some((ext) => name.endsWith(ext));
   };
 
@@ -126,19 +132,29 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   const handlePromptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const query = promptInput.trim();
     if (!query && attachedFiles.length === 0) return;
 
-    if (attachedFiles.length > 0 && onUploadFiles) {
-      const dt = new DataTransfer();
-      attachedFiles.forEach((f) => dt.items.add(f));
-      await onUploadFiles(dt.files);
-      setAttachedFiles([]);
-    }
+    setIsSubmitting(true);
+    try {
+      if (attachedFiles.length > 0 && onUploadFiles) {
+        const staged = [...attachedFiles];
+        setAttachedFiles([]);
+        const dt = new DataTransfer();
+        staged.forEach((f) => dt.items.add(f));
+        await onUploadFiles(dt.files);
+      }
 
-    if (query) {
-      onAskQuery(query);
-      setPromptInput('');
+      if (query) {
+        onAskQuery(query);
+        setPromptInput('');
+      }
+    } catch (err) {
+      console.error('Failed to submit prompt/evidence:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -547,10 +563,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             {/* Send Button (White circle with up arrow) */}
             <button
               type="submit"
-              disabled={!promptInput.trim() && attachedFiles.length === 0}
+              disabled={isSubmitting || (!promptInput.trim() && attachedFiles.length === 0)}
               className="w-7 h-7 rounded-full bg-white hover:bg-slate-200 text-black flex items-center justify-center transition-colors disabled:opacity-30 shrink-0 shadow"
             >
-              <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin text-black" />
+              ) : (
+                <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+              )}
             </button>
           </div>
         </form>

@@ -349,11 +349,46 @@ export const App: React.FC = () => {
     sourceAttribution?: string,
     clientId?: string
   ) => {
-    if (!currentInvestigation) return;
+    let targetInv = currentInvestigation;
+    if (!targetInv) {
+      if (investigations.length > 0) {
+        targetInv = investigations[0];
+        setCurrentInvestigation(targetInv);
+      } else {
+        // Automatically create an investigation if none exists
+        try {
+          const created = await api.createInvestigation(
+            `Case ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+            'Direct evidence upload investigation'
+          );
+          if (user) {
+            saveInvestigationToFirestore(user.uid, {
+              investigationId: String(created.id),
+              investigationName: created.title,
+              investigationStatus: created.status || 'ACTIVE',
+              uploadedEvidenceReferences: [],
+            }).catch(() => undefined);
+          }
+          setInvestigations([created]);
+          setCurrentInvestigation(created);
+          targetInv = created;
+        } catch (cErr: any) {
+          console.error('Auto case creation error:', cErr);
+          setErrorNotification('Please select or create an investigation first.');
+          return;
+        }
+      }
+    }
+
+    if (!targetInv) {
+      setErrorNotification('No active investigation found.');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await api.uploadEvidence(
-        currentInvestigation.id,
+        targetInv.id,
         files,
         sourceAttribution,
         clientId,
@@ -362,10 +397,10 @@ export const App: React.FC = () => {
       await refreshCaseData();
 
       // Sync bundle to Firestore for persistent cloud record
-      if (user && currentInvestigation) {
+      if (user && targetInv) {
         try {
-          const bundle = await api.getAnalysisBundle(currentInvestigation.id);
-          await saveAnalysisBundleToFirestore(user.uid, currentInvestigation.id, bundle);
+          const bundle = await api.getAnalysisBundle(targetInv.id);
+          await saveAnalysisBundleToFirestore(user.uid, targetInv.id, bundle);
         } catch (fsErr) {
           console.warn('Firestore sync warning (offline or network mode):', fsErr);
         }
@@ -594,8 +629,8 @@ export const App: React.FC = () => {
             onNewInvestigation={() => setIsCreatingCase(true)}
             onAskQuery={handleAskFromDashboard}
             onUploadFiles={async (files) => {
-              await handleUploadEvidence(Array.from(files));
               setActiveTab('repository');
+              await handleUploadEvidence(Array.from(files));
             }}
             theme={theme}
             onToggleTheme={toggleTheme}

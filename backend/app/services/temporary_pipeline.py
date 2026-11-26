@@ -24,7 +24,7 @@ from app.services.investigation_assistant import query_investigation_assistant
 logger = logging.getLogger("cerberus.temporary_pipeline")
 
 ALLOWED_EXTENSIONS = {
-    ".pdf", ".docx", ".txt", ".jpg", ".jpeg", ".png", ".xlsx", ".csv", ".json", ".sql", ".sqlite", ".db"
+    ".pdf", ".docx", ".doc", ".txt", ".md", ".markdown", ".jpg", ".jpeg", ".png", ".webp", ".xlsx", ".xls", ".csv", ".json", ".sql", ".sqlite", ".db"
 }
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB per file
 
@@ -166,6 +166,7 @@ async def process_evidence_batch_temporarily(
             total_files=len(files)
         )
 
+        skipped_reasons = []
         for idx, f in enumerate(files, start=1):
             if ws_manager.is_cancelled(client_id):
                 raise HTTPException(status_code=499, detail="Processing cancelled by investigator.")
@@ -173,15 +174,29 @@ async def process_evidence_batch_temporarily(
             clean_name = sanitize_filename(f.filename or "file")
             ext = Path(clean_name).suffix.lower()
 
+            # Skip OS junk / hidden files (e.g. .DS_Store, Thumbs.db)
+            if clean_name.startswith(".") or clean_name.lower() in ("thumbs.db", "desktop.ini"):
+                skipped_reasons.append(f"{clean_name}: OS metadata file ignored")
+                continue
+
             if ext not in ALLOWED_EXTENSIONS:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Unsupported format '{ext}' for file '{clean_name}'. Supported: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
-                )
+                if len(files) == 1:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Unsupported format '{ext}' for file '{clean_name}'. Supported: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+                    )
+                else:
+                    skipped_reasons.append(f"{clean_name}: Unsupported extension '{ext}'")
+                    continue
 
             contents = await f.read()
             if len(contents) == 0:
-                raise HTTPException(status_code=400, detail=f"File '{clean_name}' is empty (0 bytes).")
+                if len(files) == 1:
+                    raise HTTPException(status_code=400, detail=f"File '{clean_name}' is empty (0 bytes).")
+                else:
+                    skipped_reasons.append(f"{clean_name}: Empty file (0 bytes)")
+                    continue
+
             if len(contents) > MAX_FILE_SIZE:
                 raise HTTPException(
                     status_code=400,
@@ -206,11 +221,15 @@ async def process_evidence_batch_temporarily(
             await ws_manager.broadcast_stage(
                 client_id,
                 "UPLOADING",
-                f"Staged {idx}/{len(files)}: {clean_name}",
+                f"Staged {len(staged_items)}/{len(files)}: {clean_name}",
                 current_file=clean_name,
-                file_index=idx,
+                file_index=len(staged_items),
                 total_files=len(files)
             )
+
+        if not staged_items:
+            reasons = "; ".join(skipped_reasons) or "All files in folder were empty or unsupported."
+            raise HTTPException(status_code=400, detail=f"No valid evidence files could be processed. {reasons}")
 
         # ========================================================
         # STAGE 2: EXTRACTING (Multimodal Ingestion)
