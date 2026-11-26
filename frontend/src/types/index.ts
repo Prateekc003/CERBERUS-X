@@ -140,11 +140,12 @@ export interface KnowledgeGraphData {
     position: { x: number; y: number };
     data: {
       id: string;
-      nodeType: 'DOCUMENT' | 'CLAIM' | 'ENTITY' | 'CONFLICT';
+      nodeType: 'DOCUMENT' | 'CLAIM' | 'ENTITY' | 'CONFLICT' | 'PROJECT';
       label: string;
       sublabel?: string;
       category?: string;
       hasConflict?: boolean;
+      isOrange?: boolean;
       payload: any;
     };
   }>;
@@ -152,7 +153,7 @@ export interface KnowledgeGraphData {
     id: string;
     source: string;
     target: string;
-    label: string;
+    label?: string;
     type: string;
     animated?: boolean;
     style?: Record<string, any>;

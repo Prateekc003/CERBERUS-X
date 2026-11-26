@@ -158,7 +158,14 @@ export const KnowledgeGraphContent: React.FC<KnowledgeGraphProps> = ({ graphData
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
   const { fitView } = useReactFlow();
 
-  const nodeTypes = useMemo(() => ({ customNode: CustomNode }), []);
+  const nodeTypes = useMemo(
+    () => ({
+      customNode: CustomNode,
+      custom: CustomNode,
+      default: CustomNode,
+    }),
+    []
+  );
 
   // Update nodes and edges when graphData updates, and auto-fit to screen
   useEffect(() => {
