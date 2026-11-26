@@ -11,7 +11,7 @@ import {
   ReportData
 } from '../types';
 
-const BASE_URL = '/api';
+const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') || '/api';
 
 export const api = {
   // System & Dashboard

@@ -159,8 +159,16 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
 
     // Connect WebSocket for live 10-stage real-time progress
     try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/ws/processing/${clientId}`;
+      const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '');
+      let wsUrl: string;
+      if (apiUrl && apiUrl.startsWith('http')) {
+        const wsProto = apiUrl.startsWith('https:') ? 'wss:' : 'ws:';
+        const host = apiUrl.replace(/^https?:\/\//, '');
+        wsUrl = `${wsProto}//${host}/api/ws/processing/${clientId}`;
+      } else {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${protocol}//${window.location.host}/api/ws/processing/${clientId}`;
+      }
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 

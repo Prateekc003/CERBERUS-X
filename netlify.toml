@@ -1,0 +1,19 @@
+# Netlify Continuous Deployment Configuration for CERBERUS-X
+# https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  # Base directory where frontend code and package.json reside
+  base = "frontend"
+  # Directory that contains the built static assets (relative to base)
+  publish = "dist"
+  # Command to build the production bundle
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single-Page App (SPA) rewrite rule to handle React routing on refresh
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
