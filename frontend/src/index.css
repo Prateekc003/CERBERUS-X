@@ -44,6 +44,29 @@
   display: none !important;
 }
 
+/* Suppress Netlify badge, drawer, and injected banners */
+#netlify-drawer,
+[data-netlify-drawer],
+.netlify-badge,
+iframe[src*="netlify"],
+div[id*="netlify"],
+div[class*="netlify"],
+a[href*="netlify.com"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  top: -9999px !important;
+  left: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  max-width: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  z-index: -9999 !important;
+}
+
 .react-flow__handle {
   width: 7px !important;
   height: 7px !important;

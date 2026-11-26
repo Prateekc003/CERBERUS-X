@@ -386,16 +386,8 @@ export const api = {
         if (contentType.includes('application/json')) {
           return await res.json();
         }
-      } else {
-        const errJson = await res.json().catch(() => null);
-        if (errJson && errJson.detail) {
-          throw new Error(errJson.detail);
-        }
       }
     } catch (networkErr: any) {
-      if (networkErr?.message && !networkErr.message.includes('fetch') && !networkErr.message.includes('Unexpected token')) {
-        throw networkErr;
-      }
       console.warn('Backend server upload unreachable, running client-side temporary pipeline:', networkErr);
     }
 

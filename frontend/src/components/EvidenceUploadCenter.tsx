@@ -315,7 +315,7 @@ export const EvidenceUploadCenter: React.FC<EvidenceUploadCenterProps> = ({
           </h1>
           <p className="text-xs text-slate-400 mt-1">
             Automated temporary ingestion pipeline for case{' '}
-            <strong className="text-blue-400 font-mono">[{currentInvestigation?.case_code || 'CASE'}]</strong>.
+            <strong className="text-blue-400 font-mono">[{currentInvestigation?.case_code || 'INV-MED-2026-001'}]</strong>.
           </p>
         </div>
 

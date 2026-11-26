@@ -17,7 +17,65 @@
         color-scheme: dark !important;
         min-height: 100vh;
       }
+      /* Suppress Netlify badge, drawer, and injected banners */
+      #netlify-drawer,
+      [data-netlify-drawer],
+      .netlify-badge,
+      iframe[src*="netlify"],
+      div[id*="netlify"],
+      div[class*="netlify"],
+      a[href*="netlify.com"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        position: absolute !important;
+        top: -9999px !important;
+        left: -9999px !important;
+        width: 0 !important;
+        height: 0 !important;
+        max-width: 0 !important;
+        max-height: 0 !important;
+        overflow: hidden !important;
+        z-index: -9999 !important;
+      }
     </style>
+    <script>
+      (function() {
+        function purgeNetlifyBadge() {
+          const selectors = [
+            '#netlify-drawer',
+            '[data-netlify-drawer]',
+            '.netlify-badge',
+            'iframe[src*="netlify"]',
+            'a[href*="netlify.com"]',
+            'div[id*="netlify-drawer"]',
+            'div[class*="netlify-drawer"]'
+          ];
+          selectors.forEach(function(sel) {
+            try {
+              document.querySelectorAll(sel).forEach(function(el) {
+                el.remove();
+              });
+            } catch (e) {}
+          });
+        }
+        purgeNetlifyBadge();
+        try {
+          const observer = new MutationObserver(purgeNetlifyBadge);
+          if (document.body) {
+            observer.observe(document.body, { childList: true, subtree: true });
+          } else {
+            window.addEventListener('DOMContentLoaded', function() {
+              purgeNetlifyBadge();
+              if (document.body) {
+                observer.observe(document.body, { childList: true, subtree: true });
+              }
+            });
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body style="background-color: #0d0d12 !important; color: #ffffff !important;" class="bg-[#0d0d12] text-white antialiased font-sans min-h-screen selection:bg-slate-700 selection:text-white">
     <div id="root" style="background-color: #0d0d12 !important; min-height: 100vh;"></div>

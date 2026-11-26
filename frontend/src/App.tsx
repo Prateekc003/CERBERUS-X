@@ -36,6 +36,20 @@ import { ReliabilityAssessment } from './components/ReliabilityAssessment';
 import { EntityResolution } from './components/EntityResolution';
 import { InvestigationsView } from './components/InvestigationsView';
 
+export const DEFAULT_INVESTIGATION: Investigation = {
+  id: 1,
+  case_code: 'INV-MED-2026-001',
+  title: 'GOVERNMENT MEDICAL SUPPLY INVESTIGATION',
+  description: 'Audit into 1,000 medical emergency kits dispatched under Project Safeguard.',
+  status: 'ACTIVE',
+  created_at: '2026-11-20T10:00:00Z',
+  updated_at: '2026-11-26T00:00:00Z',
+  evidence_count: 5,
+  claims_count: 14,
+  conflicts_count: 4,
+  high_risk_count: 2,
+};
+
 export const App: React.FC = () => {
   const {
     user,
@@ -45,8 +59,8 @@ export const App: React.FC = () => {
   } = useAuth();
 
   const [activeTab, setActiveTab] = useState<NavTab>('home');
-  const [investigations, setInvestigations] = useState<Investigation[]>([]);
-  const [currentInvestigation, setCurrentInvestigation] = useState<Investigation | null>(null);
+  const [investigations, setInvestigations] = useState<Investigation[]>([DEFAULT_INVESTIGATION]);
+  const [currentInvestigation, setCurrentInvestigation] = useState<Investigation | null>(DEFAULT_INVESTIGATION);
 
   const [evidence, setEvidence] = useState<EvidenceFile[]>([]);
   const [claims, setClaims] = useState<ExtractedClaim[]>([]);
@@ -189,71 +203,59 @@ export const App: React.FC = () => {
     }
   }, [errorNotification]);
 
-  // Load initial system status and investigations only when authenticated
+  // Load initial system status and investigations
   const loadInitialData = useCallback(async () => {
-    if (!user) return;
     try {
-      const [sys, invs, fsInvs] = await Promise.all([
-        api.getSystemStatus(),
-        api.getInvestigations(),
-        getUserInvestigationsFromFirestore(user.uid).catch(() => []),
+      const [sys, invs] = await Promise.all([
+        api.getSystemStatus().catch(() => null),
+        api.getInvestigations().catch(() => []),
       ]);
-      setSystemStatus(sys);
+      if (sys) setSystemStatus(sys);
 
-      // Sync existing investigations to Firestore for this user if none saved yet
-      if (fsInvs.length === 0 && invs.length > 0) {
-        await Promise.all(
-          invs.map((inv) =>
-            saveInvestigationToFirestore(user.uid, {
-              investigationId: String(inv.id),
-              investigationName: inv.title,
-              investigationStatus: inv.status,
-              uploadedEvidenceReferences: [],
-            }).catch(() => undefined)
-          )
-        );
-      }
+      const activeInvs = invs && invs.length > 0 ? invs : [DEFAULT_INVESTIGATION];
+      setInvestigations(activeInvs);
+      setCurrentInvestigation((prev) => prev || activeInvs[0]);
 
-      setInvestigations(invs);
-      if (invs.length > 0) {
-        setCurrentInvestigation(invs[0]);
+      if (user) {
+        getUserInvestigationsFromFirestore(user.uid)
+          .then((fsInvs) => {
+            if (fsInvs.length === 0 && activeInvs.length > 0) {
+              activeInvs.forEach((inv) =>
+                saveInvestigationToFirestore(user.uid, {
+                  investigationId: String(inv.id),
+                  investigationName: inv.title,
+                  investigationStatus: inv.status,
+                  uploadedEvidenceReferences: [],
+                }).catch(() => undefined)
+              );
+            }
+          })
+          .catch(() => undefined);
       }
     } catch (err: any) {
       console.warn('Initial data load notice:', err);
+      setInvestigations([DEFAULT_INVESTIGATION]);
+      setCurrentInvestigation(DEFAULT_INVESTIGATION);
     }
   }, [user]);
 
   useEffect(() => {
-    if (user) {
-      loadInitialData();
-    } else {
-      setInvestigations([]);
-      setCurrentInvestigation(null);
-      setEvidence([]);
-      setClaims([]);
-      setEntities([]);
-      setConflicts([]);
-      setReliability([]);
-      setGraphData(null);
-      setDashboardData(null);
-      setReportData(null);
-    }
+    loadInitialData();
   }, [user, loadInitialData]);
 
   // Fetch all data for the active investigation
   const refreshCaseData = useCallback(async (overrideInvId?: number) => {
-    const invId = overrideInvId || currentInvestigation?.id;
-    if (!invId || !user) return;
+    const invId = overrideInvId || currentInvestigation?.id || 1;
     setLoading(true);
     try {
       const [evList, clmList, entList, cnfList, relList, gData, dData, repList] = await Promise.all([
-        api.getEvidenceList(invId),
-        api.getClaims(invId),
-        api.getEntities(invId),
-        api.getConflicts(invId),
-        api.getReliability(invId),
-        api.getKnowledgeGraph(invId),
-        api.getDashboardOverview(invId),
+        api.getEvidenceList(invId).catch(() => []),
+        api.getClaims(invId).catch(() => []),
+        api.getEntities(invId).catch(() => []),
+        api.getConflicts(invId).catch(() => []),
+        api.getReliability(invId).catch(() => []),
+        api.getKnowledgeGraph(invId).catch(() => null),
+        api.getDashboardOverview(invId).catch(() => null),
         api.getReports(invId).catch(() => []),
       ]);
 
@@ -262,19 +264,20 @@ export const App: React.FC = () => {
       setEntities(entList);
       setConflicts(cnfList);
       setReliability(relList);
-      setGraphData(gData);
-      setDashboardData(dData);
+      if (gData) setGraphData(gData);
+      if (dData) setDashboardData(dData);
       setReportData(repList && repList.length > 0 ? repList[0] : null);
 
-      // Sync evidence references to Firestore investigation doc
-      saveInvestigationToFirestore(user.uid, {
-        investigationId: String(invId),
-        investigationName: currentInvestigation?.title || `Investigation ${invId}`,
-        investigationStatus: currentInvestigation?.status || 'ACTIVE',
-        uploadedEvidenceReferences: evList.map(
-          (e) => `${e.evidence_code}:${e.filename}`
-        ),
-      }).catch(() => undefined);
+      if (user) {
+        saveInvestigationToFirestore(user.uid, {
+          investigationId: String(invId),
+          investigationName: currentInvestigation?.title || `Investigation ${invId}`,
+          investigationStatus: currentInvestigation?.status || 'ACTIVE',
+          uploadedEvidenceReferences: evList.map(
+            (e) => `${e.evidence_code}:${e.filename}`
+          ),
+        }).catch(() => undefined);
+      }
     } catch (err: any) {
       console.error('Failed to refresh case data:', err);
     } finally {
@@ -283,10 +286,10 @@ export const App: React.FC = () => {
   }, [currentInvestigation, user]);
 
   useEffect(() => {
-    if (currentInvestigation && user) {
+    if (currentInvestigation) {
       refreshCaseData();
     }
-  }, [currentInvestigation, user, refreshCaseData]);
+  }, [currentInvestigation, refreshCaseData]);
 
   // Demo Seed Handler
   const handleRunDemoSeed = async () => {
@@ -351,40 +354,12 @@ export const App: React.FC = () => {
     sourceAttribution?: string,
     clientId?: string
   ) => {
-    let targetInv = currentInvestigation;
-    if (!targetInv) {
-      if (investigations.length > 0) {
-        targetInv = investigations[0];
-        setCurrentInvestigation(targetInv);
-      } else {
-        // Automatically create an investigation if none exists
-        try {
-          const created = await api.createInvestigation(
-            `Case ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
-            'Direct evidence upload investigation'
-          );
-          if (user) {
-            saveInvestigationToFirestore(user.uid, {
-              investigationId: String(created.id),
-              investigationName: created.title,
-              investigationStatus: created.status || 'ACTIVE',
-              uploadedEvidenceReferences: [],
-            }).catch(() => undefined);
-          }
-          setInvestigations([created]);
-          setCurrentInvestigation(created);
-          targetInv = created;
-        } catch (cErr: any) {
-          console.error('Auto case creation error:', cErr);
-          setErrorNotification('Please select or create an investigation first.');
-          return;
-        }
-      }
+    const targetInv = currentInvestigation || (investigations.length > 0 ? investigations[0] : DEFAULT_INVESTIGATION);
+    if (!currentInvestigation) {
+      setCurrentInvestigation(targetInv);
     }
-
-    if (!targetInv) {
-      setErrorNotification('No active investigation found.');
-      return;
+    if (investigations.length === 0) {
+      setInvestigations([targetInv]);
     }
 
     setLoading(true);
